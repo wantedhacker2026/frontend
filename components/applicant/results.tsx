@@ -84,6 +84,21 @@ export function ApplicationResult({
           </Link>
         </Button>
       </div>
+      {app.resumeSource && (
+        <div className="resume-submission-label">
+          <FilePenLine size={15} />
+          <span>
+            제출한 버전: <strong>{app.resumeSource.title}</strong> · v{app.resumeSource.revision}
+          </span>
+          <small>제출 당시 내용으로 분석</small>
+        </div>
+      )}
+      {db.ownApplicationIds.includes(applicationId) && !improvement && (
+        <Link className="text-link mb-4" href={`/resumes/new?applicationId=${applicationId}`}>
+          이 지원서로 새 버전 만들기
+          <ArrowRight size={14} />
+        </Link>
+      )}
       <nav className="result-tabs">
         <Link className={!improvement ? 'active' : ''} href={`/applications/${applicationId}`}>
           <Sparkles size={16} />
@@ -309,6 +324,12 @@ export function ApplicationsList() {
                   <span className="job-company">{j.companyName}</span>
                   <h2>{j.title}</h2>
                   <p className="muted text-sm mt-2">지원 완료 · 매칭 분석 완료</p>
+                  <p className="resume-history-label">
+                    {a.resumeSource
+                      ? `${a.resumeSource.title} · v${a.resumeSource.revision}`
+                      : '직접 작성한 지원서'}{' '}
+                    · {new Date(a.createdAt).toLocaleDateString('ko-KR')}
+                  </p>
                 </div>
                 <MatchScore score={e.totalScore} compact />
                 <ArrowRight size={20} />

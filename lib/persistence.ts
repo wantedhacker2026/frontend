@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { Database } from '@/types';
+import { applicationContent, applicationInputSchema } from './resumes';
 const str = z.string();
 const num = z.number().finite();
 const category = z.enum(['기술 역량', '경험', '협업', '우대사항']);
@@ -13,7 +14,19 @@ const actionType = z.enum([
   'LEARNING',
 ]);
 const schema = z.object({
-  version: z.literal(1),
+  version: z.union([z.literal(1), z.literal(2)]),
+  resumes: z
+    .array(
+      z.object({
+        id: str,
+        title: str.trim().min(1).max(80),
+        content: applicationInputSchema,
+        revision: num.int().min(1),
+        createdAt: z.iso.datetime(),
+        updatedAt: z.iso.datetime(),
+      }),
+    )
+    .optional(),
   jobs: z.array(
     z.object({
       id: str,
@@ -54,6 +67,7 @@ const schema = z.object({
       additionalExperience: str,
       createdAt: z.iso.datetime(),
       status: z.enum(['NEW', 'REVIEWED', 'SHORTLISTED']),
+      resumeSource: z.object({ versionId: str, title: str, revision: num.int().min(1) }).optional(),
     }),
   ),
   evaluations: z.array(
@@ -100,7 +114,10 @@ const schema = z.object({
 });
 export const STORAGE_KEY = 'shortlist-demo-v1';
 export function parseDatabase(raw: string): Database {
-  const db = schema.parse(JSON.parse(raw));
+  const saved = schema.parse(JSON.parse(raw));
+  if (saved.version === 2 && !saved.resumes)
+    throw new Error('지원서 버전 데이터를 찾을 수 없습니다.');
+  const db: Database = { ...saved, version: 2, resumes: saved.resumes ?? [] };
   for (const job of db.jobs) {
     const criteria = db.criteria.filter((c) => c.jobId === job.id);
     if (!criteria.length || criteria.reduce((sum, c) => sum + c.weight, 0) !== 100)
@@ -114,5 +131,29 @@ export function parseDatabase(raw: string): Database {
     )
       throw new Error('지원서 데이터 연결을 확인할 수 없습니다.');
   }
+  if (saved.version === 1) {
+    // Keep the same storage key and migrate only the user's submissions, never seeded candidates.
+    for (const app of db.applications.filter((a) => db.ownApplicationIds.includes(a.id))) {
+      const candidate = db.candidates.find((c) => c.id === app.candidateId)!;
+      const content = applicationContent(app, candidate);
+      // Older releases allowed optional email text. Preserve the original submission in all cases.
+      const valid = applicationInputSchema.safeParse(content);
+      if (!valid.success) continue;
+      const job = db.jobs.find((j) => j.id === app.jobId)!;
+      const id = `resume-import-${app.id}`;
+      const title = `${job.title} · 기존 지원서`.slice(0, 80);
+      db.resumes.push({
+        id,
+        title,
+        content: valid.data,
+        revision: 1,
+        createdAt: app.createdAt,
+        updatedAt: app.createdAt,
+      });
+      app.resumeSource = { versionId: id, title, revision: 1 };
+    }
+  }
+  if (new Set(db.resumes.map((r) => r.id)).size !== db.resumes.length)
+    throw new Error('중복된 지원서 버전이 있습니다.');
   return db;
 }

@@ -8,6 +8,7 @@ import {
   CircleHelp,
   Compass,
   FileCheck2,
+  FileText,
   Layers2,
   LayoutDashboard,
   Menu,
@@ -90,6 +91,7 @@ export function Shell({
               ]
             : [
                 { href: '/jobs', icon: Compass, label: '채용공고 탐색' },
+                { href: '/resumes', icon: FileText, label: '내 지원서' },
                 { href: '/applications', icon: FileCheck2, label: '내 지원 현황' },
               ]
           ).map(({ href, icon: Icon, label }) => (
@@ -98,7 +100,9 @@ export function Shell({
               href={href}
               onClick={() => setMobile(false)}
               className={
-                path === href || (label === '지원자 관리' && path.includes('/candidates'))
+                path === href ||
+                (href === '/resumes' && path.startsWith('/resumes/')) ||
+                (label === '지원자 관리' && path.includes('/candidates'))
                   ? 'active'
                   : ''
               }
@@ -210,7 +214,7 @@ export function Shell({
       >
         <ol className="guide-list">
           <li>채용담당자: 공고 → 지원자 비교 → 근거 확인 → 검토 상태 변경</li>
-          <li>지원자: 공고 탐색 → 지원서 작성 → 매칭 분석 → 개선 계획</li>
+          <li>지원자: 내 지원서 버전 저장 → 공고에서 버전 선택 → 매칭 분석 → 개선 계획</li>
           <li>채용 기준을 수정하면 지원서가 모두 다시 평가됩니다.</li>
         </ol>
         <p className="info-box my-5">
@@ -231,7 +235,7 @@ export function Shell({
         open={confirmReset}
         onOpenChange={setConfirmReset}
         title="데모 데이터를 초기화할까요?"
-        description="이 브라우저에서 추가한 공고, 지원서, 검토 상태, 완료한 액션을 지우고 처음 상태로 되돌립니다."
+        description="이 브라우저에서 추가한 공고, 저장한 지원서 버전, 제출 내역, 검토 상태, 완료한 액션을 지우고 처음 상태로 되돌립니다."
       >
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => setConfirmReset(false)}>
