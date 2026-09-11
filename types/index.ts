@@ -51,11 +51,25 @@ export interface Application {
   additionalExperience: string;
   createdAt: string;
   status: ReviewStatus;
+  resumeSource?: ResumeSource;
 }
 export type ApplicationInput = Omit<
   Application,
-  'id' | 'candidateId' | 'jobId' | 'createdAt' | 'status'
+  'id' | 'candidateId' | 'jobId' | 'createdAt' | 'status' | 'resumeSource'
 > & { name: string; email: string };
+export interface ResumeSource {
+  versionId: string;
+  title: string;
+  revision: number;
+}
+export interface ResumeVersion {
+  id: string;
+  title: string;
+  content: ApplicationInput;
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+}
 export type EvaluationLevel = 'Strong' | 'Good' | 'Partial' | 'Unverified';
 export interface EvaluationItem {
   id: string;
@@ -106,7 +120,8 @@ export interface Evaluation {
 }
 export type EvaluationResult = Evaluation;
 export interface Database {
-  version: 1;
+  version: 2;
+  resumes: ResumeVersion[];
   jobs: Job[];
   criteria: EvaluationCriterion[];
   candidates: Candidate[];
