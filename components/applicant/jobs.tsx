@@ -169,7 +169,7 @@ export function JobDetail({ jobId }: { jobId: string }) {
               얼마나 연결될까요?
             </h2>
             <p>
-              지원서를 작성하면 매칭 점수와
+              저장한 지원서 버전을 선택하면 매칭 점수와
               <br />
               다음 성장 방향을 확인할 수 있어요.
             </p>
@@ -193,7 +193,15 @@ export function JobDetail({ jobId }: { jobId: string }) {
                 <ArrowRight size={16} />
               </Link>
             </Button>
-            <small>약 5분 · 회원가입 없이 체험</small>
+            <Link className="text-link mt-4" href="/resumes">
+              내 지원서 버전 관리
+              <ArrowRight size={14} />
+            </Link>
+            <small>
+              {db.resumes.length
+                ? `선택 가능한 지원서 ${db.resumes.length}개`
+                : '새 지원서를 작성하고 저장할 수도 있어요.'}
+            </small>
           </div>
           <div className="info-box mt-4">
             데모 지원서는 이 브라우저에만 저장되며 실제 기업에 전송되지 않습니다.

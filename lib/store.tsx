@@ -1,11 +1,18 @@
 'use client';
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ApplicationInput, Database, EvaluationCriterion, Job, ReviewStatus } from '@/types';
 import { createSeedDatabase } from '@/data/mock/seed';
 import { evaluator } from './evaluation/mock-evaluator';
 import { validateCriteria } from '@/data/mock/criteria';
 import { parseDatabase, STORAGE_KEY } from './persistence';
-import { uid } from './utils';
+import {
+  duplicateResumeVersion,
+  prepareResumeSubmission,
+  prepareSubmission,
+  recordSubmission,
+  removeResumeVersion,
+  saveResumeVersion,
+} from './resumes';
 interface Store {
   db: Database;
   ready: boolean;
@@ -18,6 +25,10 @@ interface Store {
     input: ApplicationInput,
     existingId?: string,
   ) => Promise<string>;
+  saveResume: (title: string, input: ApplicationInput, existingId?: string) => string;
+  duplicateResume: (id: string) => string;
+  deleteResume: (id: string) => void;
+  submitResume: (jobId: string, resumeId: string) => Promise<string>;
   setStatus: (applicationId: string, status: ReviewStatus) => void;
   toggleAction: (id: string) => void;
   reset: () => void;
@@ -25,6 +36,7 @@ interface Store {
 const Context = createContext<Store | null>(null);
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [db, setDb] = useState<Database>(createSeedDatabase);
+  const dbRef = useRef(db);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Browser storage is an external system; hydrate after SSR before rendering editable views.
@@ -32,7 +44,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) setDb(parseDatabase(saved));
+      if (saved) {
+        const restored = parseDatabase(saved);
+        dbRef.current = restored;
+        setDb(restored);
+      }
     } catch {
       setError(
         '저장된 데이터를 읽지 못해 데모 데이터를 불러왔습니다. 현재 변경 사항은 이 브라우저에서만 유지됩니다.',
@@ -41,14 +57,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setReady(true);
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
-  function commit(next: Database) {
+  function commit(next: Database, requireStorage = false) {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     } catch {
+      if (requireStorage)
+        throw new Error(
+          '브라우저에 저장하지 못했습니다. 저장 공간과 브라우저 설정을 확인한 뒤 다시 시도해 주세요.',
+        );
       setError(
         '브라우저 저장 공간을 사용할 수 없습니다. 현재 화면에서는 동작하지만 새로고침하면 변경 사항이 사라질 수 있습니다.',
       );
     }
+    dbRef.current = next;
     setDb(next);
   }
   function addJob(job: Job, criteria: EvaluationCriterion[]) {
@@ -75,53 +96,34 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       completedActionIds: db.completedActionIds.filter((id) => !oldActionIds.includes(id)),
     });
   }
-  async function submitApplication(jobId: string, input: ApplicationInput, existingId?: string) {
-    const job = db.jobs.find((j) => j.id === jobId);
-    if (!job) throw new Error('공고를 찾을 수 없습니다.');
-    if (
-      !input.name.trim() ||
-      !input.skills.trim() ||
-      !input.projects.trim() ||
-      !input.introduction.trim() ||
-      !input.motivation.trim() ||
-      !input.collaboration.trim() ||
-      !Number.isFinite(input.experience) ||
-      input.experience < 0 ||
-      input.experience > 60
-    )
-      throw new Error('필수 입력값을 확인해 주세요.');
-    const existing = existingId
-      ? db.applications.find((a) => a.id === existingId && a.jobId === jobId)
-      : undefined;
-    if (existingId && !existing) throw new Error('수정할 지원서를 찾을 수 없습니다.');
-    const id = existing?.id ?? uid('application');
-    const candidateId = existing?.candidateId ?? uid('candidate');
-    const { name, email, ...experienceInput } = input;
-    const candidate = { id: candidateId, name: name.trim(), email: email.trim() };
-    const application = {
-      ...experienceInput,
-      id,
-      candidateId,
-      jobId,
-      status: 'NEW' as const,
-      createdAt: existing?.createdAt ?? new Date().toISOString(),
-    };
+  async function evaluateSubmission(prepared: ReturnType<typeof prepareSubmission>) {
+    const { job, candidate, application } = prepared;
     const evaluation = await evaluator.evaluate(
       job,
-      db.criteria.filter((c) => c.jobId === jobId),
+      dbRef.current.criteria.filter((c) => c.jobId === job.id),
       application,
     );
-    const previousActionIds =
-      db.evaluations.find((e) => e.applicationId === id)?.actions.map((a) => a.id) ?? [];
-    commit({
-      ...db,
-      candidates: [...db.candidates.filter((c) => c.id !== candidateId), candidate],
-      applications: [...db.applications.filter((a) => a.id !== id), application],
-      evaluations: [...db.evaluations.filter((e) => e.applicationId !== id), evaluation],
-      completedActionIds: db.completedActionIds.filter((id) => !previousActionIds.includes(id)),
-      ownApplicationIds: Array.from(new Set([...db.ownApplicationIds, id])),
-    });
-    return id;
+    commit(recordSubmission(dbRef.current, candidate, application, evaluation), true);
+    return application.id;
+  }
+  async function submitApplication(jobId: string, input: ApplicationInput, existingId?: string) {
+    return evaluateSubmission(prepareSubmission(dbRef.current, jobId, input, existingId));
+  }
+  async function submitResume(jobId: string, resumeId: string) {
+    return evaluateSubmission(prepareResumeSubmission(dbRef.current, jobId, resumeId));
+  }
+  function saveResume(title: string, input: ApplicationInput, existingId?: string) {
+    const saved = saveResumeVersion(dbRef.current, title, input, existingId);
+    commit(saved.db, true);
+    return saved.resume.id;
+  }
+  function duplicateResume(id: string) {
+    const saved = duplicateResumeVersion(dbRef.current, id);
+    commit(saved.db, true);
+    return saved.resume.id;
+  }
+  function deleteResume(id: string) {
+    commit(removeResumeVersion(dbRef.current, id), true);
   }
   return (
     <Context.Provider
@@ -133,6 +135,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         addJob,
         updateCriteria,
         submitApplication,
+        saveResume,
+        duplicateResume,
+        deleteResume,
+        submitResume,
         setStatus: (id, status) =>
           commit({
             ...db,

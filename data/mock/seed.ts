@@ -289,7 +289,8 @@ export function createSeedDatabase(): Database {
     status: i === 0 || i === 8 ? 'SHORTLISTED' : i % 4 === 1 ? 'REVIEWED' : 'NEW',
   }));
   return {
-    version: 1,
+    version: 2,
+    resumes: [],
     jobs: seedJobs,
     criteria,
     candidates,
