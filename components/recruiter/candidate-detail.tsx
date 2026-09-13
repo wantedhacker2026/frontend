@@ -6,7 +6,8 @@ import { reviewLabels, type ReviewStatus } from '@/types';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/states';
 import { MatchScore, RequirementChecklist } from '@/components/evaluation/score';
-import { EvaluationTable } from '@/components/evaluation/evaluation-table';
+import { DocumentAnalysis } from '@/components/evaluation/document-analysis';
+import { JDBrief } from '@/components/evaluation/jd-brief';
 import { rowSignals } from '@/lib/candidates';
 import { formatDate } from '@/lib/utils';
 export function CandidateDetail({ jobId, candidateId }: { jobId: string; candidateId: string }) {
@@ -75,13 +76,19 @@ export function CandidateDetail({ jobId, candidateId }: { jobId: string; candida
           <small>추천은 검토 보조 정보입니다. 실제 채용 결정은 담당자가 진행합니다.</small>
         </div>
       </div>
+      <JDBrief job={job} criteria={criteria} />
       <div className="detail-layout">
         <div>
           <div className="section-heading">
             <h2>JD 평가표</h2>
             <span className="muted text-xs">배점 합계 100점 · 내부 평가 기준</span>
           </div>
-          <EvaluationTable criteria={criteria} evaluation={evaluation} />
+          <DocumentAnalysis
+            criteria={criteria}
+            evaluation={evaluation}
+            application={application}
+            recruiter
+          />
           <details className="resume-disclosure">
             <summary>
               <FileText size={18} />

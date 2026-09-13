@@ -9,6 +9,7 @@ import {
   Compass,
   FileCheck2,
   FileText,
+  FolderOpen,
   Layers2,
   LayoutDashboard,
   Menu,
@@ -62,7 +63,7 @@ export function Shell({
   const [confirmReset, setConfirmReset] = useState(false);
   const recruiter = role === 'recruiter';
   return (
-    <div className="app-shell">
+    <div className="app-shell framer-workspace">
       <aside className={`sidebar ${mobile ? 'sidebar-open' : ''}`}>
         <div className="sidebar-logo">
           <Logo />
@@ -119,7 +120,9 @@ export function Shell({
         </nav>
         {recruiter && (
           <>
-            <p className="nav-section mt-8">진행 중인 채용</p>
+            <p className="nav-section mt-8">
+              <FolderOpen size={14} /> 채용 프로젝트
+            </p>
             <nav className="job-nav">
               {db.jobs.slice(0, 5).map((job, i) => (
                 <Link
@@ -132,6 +135,42 @@ export function Shell({
                   <span>{job.title}</span>
                 </Link>
               ))}
+            </nav>
+          </>
+        )}
+        {!recruiter && (
+          <>
+            <p className="nav-section mt-8">
+              <FolderOpen size={14} /> 나의 프로젝트
+            </p>
+            <nav className="job-nav" aria-label="공고별 프로젝트">
+              {db.jobs.map((job, i) => {
+                const latest = db.applications
+                  .filter((a) => a.jobId === job.id && db.ownApplicationIds.includes(a.id))
+                  .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+                const current = db.applications.find((a) =>
+                  path.startsWith(`/applications/${a.id}`),
+                );
+                const active =
+                  path === `/jobs/${job.id}` ||
+                  path.startsWith(`/jobs/${job.id}/`) ||
+                  current?.jobId === job.id;
+                return (
+                  <Link
+                    key={job.id}
+                    href={latest ? `/applications/${latest.id}` : `/jobs/${job.id}`}
+                    onClick={() => setMobile(false)}
+                    className={active ? 'selected' : ''}
+                    aria-current={active ? 'page' : undefined}
+                  >
+                    <span className={`job-dot dot-${i % 3}`} />
+                    <span>
+                      {job.title}
+                      <small>{latest ? '내 분석 결과' : '공고 살펴보기'}</small>
+                    </span>
+                  </Link>
+                );
+              })}
             </nav>
           </>
         )}
