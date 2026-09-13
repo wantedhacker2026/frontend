@@ -3,7 +3,7 @@ import { generateCriteria } from './criteria';
 import { MockCandidateEvaluator } from '@/lib/evaluation/mock-evaluator';
 const seedEvaluator = new MockCandidateEvaluator();
 export const backendDescription = `함께 일하는 방식을 바꾸는 제품을 만듭니다.
-Shortlist Studio에서 안정적이고 확장 가능한 서비스를 함께 만들어 갈 Backend Engineer를 찾습니다.
+wantedhacker에서 안정적이고 확장 가능한 서비스를 함께 만들어 갈 Backend Engineer를 찾습니다.
 
 주요 업무
 • 핵심 서비스의 백엔드 API 설계 및 개발
@@ -28,7 +28,7 @@ Shortlist Studio에서 안정적이고 확장 가능한 서비스를 함께 만�
 export const seedJobs: Job[] = [
   {
     id: 'backend',
-    companyName: 'Shortlist Studio',
+    companyName: 'wantedhacker',
     title: 'Backend Engineer',
     role: '백엔드 개발',
     description: backendDescription,
@@ -39,7 +39,7 @@ export const seedJobs: Job[] = [
   },
   {
     id: 'frontend',
-    companyName: 'Shortlist Studio',
+    companyName: 'wantedhacker',
     title: 'Frontend Engineer',
     role: '프론트엔드 개발',
     description:
@@ -51,7 +51,7 @@ export const seedJobs: Job[] = [
   },
   {
     id: 'data',
-    companyName: 'Shortlist Studio',
+    companyName: 'wantedhacker',
     title: 'Data Engineer',
     role: '데이터 엔지니어',
     description:

@@ -119,6 +119,14 @@ export function parseDatabase(raw: string): Database {
     throw new Error('지원서 버전 데이터를 찾을 수 없습니다.');
   const db: Database = { ...saved, version: 2, resumes: saved.resumes ?? [] };
   for (const job of db.jobs) {
+    // Rename only legacy demo branding; keep user-authored jobs and submissions intact.
+    if (
+      ['backend', 'frontend', 'data'].includes(job.id) &&
+      job.companyName === 'Shortlist Studio'
+    ) {
+      job.companyName = 'wantedhacker';
+      job.description = job.description.replace('Shortlist Studio에서', 'wantedhacker에서');
+    }
     const criteria = db.criteria.filter((c) => c.jobId === job.id);
     if (!criteria.length || criteria.reduce((sum, c) => sum + c.weight, 0) !== 100)
       throw new Error('평가 기준 데이터가 올바르지 않습니다.');

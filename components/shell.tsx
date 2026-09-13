@@ -23,11 +23,11 @@ import { Button } from './ui/button';
 import { Dialog } from './ui/dialog';
 export function Logo({ light = false }: { light?: boolean }) {
   return (
-    <Link href="/" className={`logo ${light ? 'logo-light' : ''}`} aria-label="Shortlist 홈">
+    <Link href="/" className={`logo ${light ? 'logo-light' : ''}`} aria-label="wantedhacker 홈">
       <span className="logo-symbol">
         <Layers2 size={21} strokeWidth={2.5} />
       </span>
-      shortlist<span className="logo-dot">.</span>
+      <span className="logo-wordmark">wantedhacker</span>
     </Link>
   );
 }
@@ -72,9 +72,9 @@ export function Shell({
           </button>
         </div>
         <div className="workspace-switch">
-          <span className="workspace-avatar">S</span>
+          <span className="workspace-avatar">W</span>
           <div>
-            <strong>Shortlist Studio</strong>
+            <strong>wantedhacker</strong>
             <small>{recruiter ? '채용 워크스페이스' : '지원자 워크스페이스'}</small>
           </div>
           <ChevronDown size={14} />
@@ -241,14 +241,14 @@ export function Shell({
           {ready ? children : <Skeleton />}
         </main>
         <footer className="app-footer">
-          <span>© 2026 Shortlist · Better signals. Better decisions.</span>
+          <span>© 2026 wantedhacker · Better signals. Better decisions.</span>
           <span>근거를 통해 가능성을 발견합니다.</span>
         </footer>
       </div>
       <Dialog
         open={help}
         onOpenChange={setHelp}
-        title="Shortlist 데모 이용 가이드"
+        title="wantedhacker 데모 이용 가이드"
         description="샘플 공고 3개와 서로 다른 지원서 20개로 전체 흐름을 체험할 수 있습니다."
       >
         <ol className="guide-list">

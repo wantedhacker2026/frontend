@@ -70,7 +70,7 @@ export function Landing() {
                   <i />
                   <i />
                 </div>
-                <span>shortlist / candidate overview</span>
+                <span>wantedhacker / candidate overview</span>
                 <ScanLine size={15} />
               </div>
               <div className="product-window-body">
@@ -253,7 +253,7 @@ export function Landing() {
       <footer className="landing-footer">
         <Logo />
         <span>Better signals. Better decisions.</span>
-        <span>© 2026 Shortlist. Demo experience.</span>
+        <span>© 2026 wantedhacker. Demo experience.</span>
       </footer>
     </div>
   );
@@ -263,7 +263,7 @@ export function RoleSelection() {
     <div className="role-page">
       <PublicNav />
       <main>
-        <div className="eyebrow">WELCOME TO SHORTLIST</div>
+        <div className="eyebrow">WELCOME TO wantedhacker</div>
         <h1>어떤 기회를 찾고 계신가요?</h1>
         <p>회원가입 없이 바로 체험할 수 있어요.</p>
         <div className="role-cards">
