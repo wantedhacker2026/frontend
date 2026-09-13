@@ -201,3 +201,25 @@ test('explicitly editing a submitted application clears stale version attributio
   assert.equal(edit.application.resumeSource, undefined);
   assert.equal(saved.resume.content.projects, sampleApplication.projects);
 });
+
+test('legacy demo branding updates without changing user jobs, resume versions or analyses', () => {
+  const { db } = saveResumeVersion(createSeedDatabase(), '보존할 버전', sampleApplication);
+  db.jobs[0].companyName = 'Shortlist Studio';
+  db.jobs[0].description = db.jobs[0].description.replace(
+    'wantedhacker에서',
+    'Shortlist Studio에서',
+  );
+  db.jobs.push({ ...db.jobs[0], id: 'custom-job' });
+  db.criteria.push(
+    ...db.criteria
+      .filter((c) => c.jobId === 'backend')
+      .map((c) => ({ ...c, id: `custom-${c.id}`, jobId: 'custom-job' })),
+  );
+  const restored = parseDatabase(JSON.stringify(db));
+  assert.equal(restored.jobs[0].companyName, 'wantedhacker');
+  assert.match(restored.jobs[0].description, /wantedhacker에서/);
+  assert.equal(restored.jobs.find((j) => j.id === 'custom-job')?.companyName, 'Shortlist Studio');
+  assert.deepEqual(restored.resumes, db.resumes);
+  assert.deepEqual(restored.applications, db.applications);
+  assert.deepEqual(restored.evaluations, db.evaluations);
+});

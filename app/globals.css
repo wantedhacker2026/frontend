@@ -230,6 +230,14 @@ svg {
   border-radius: 7px;
   width: 30px;
   height: 31px;
+  flex-shrink: 0;
+}
+.logo-wordmark {
+  white-space: nowrap;
+}
+.sidebar .logo {
+  font-size: 19px;
+  gap: 6px;
 }
 .logo-dot {
   color: #3b7759;

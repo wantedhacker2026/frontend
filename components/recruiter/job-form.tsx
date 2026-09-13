@@ -18,7 +18,7 @@ export function JobForm({ jobId }: { jobId?: string }) {
   const [id] = useState(() => jobId ?? uid('job'));
   const [title, setTitle] = useState('Backend Engineer');
   const [role, setRole] = useState('백엔드 개발');
-  const [company, setCompany] = useState('Shortlist Studio');
+  const [company, setCompany] = useState('wantedhacker');
   const [description, setDescription] = useState(backendDescription);
   const [minExperience, setMinExperience] = useState(1);
   const [criteria, setCriteria] = useState<EvaluationCriterion[]>(

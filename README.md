@@ -1,4 +1,4 @@
-# Shortlist
+# wantedhacker
 
 **지원서를 읽는 시간은 줄이고, 더 좋은 채용 결정에 집중하세요.**
 
