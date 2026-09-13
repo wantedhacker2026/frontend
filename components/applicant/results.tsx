@@ -21,6 +21,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/states';
 import { ActionCard, ImprovementRoadmap, NoGaps } from './actions';
+import { JDBrief } from '@/components/evaluation/jd-brief';
+import { DocumentAnalysis } from '@/components/evaluation/document-analysis';
 export function ApplicationResult({
   applicationId,
   improvement = false,
@@ -69,9 +71,7 @@ export function ApplicationResult({
             {improvement ? 'SMALL STEPS, NEXT OPPORTUNITY' : 'YOUR NEXT CHAPTER'}
           </div>
           <h1>
-            {improvement
-              ? '오늘의 한 걸음, 내일의 가능성.'
-              : `${candidate.name}님의 경험을 연결했어요.`}
+            {improvement ? '오늘의 한 걸음, 내일의 가능성.' : `${candidate.name}님의 서류 분석`}
           </h1>
           <p>
             {job.companyName} · {job.title}
@@ -80,7 +80,7 @@ export function ApplicationResult({
         <Button asChild variant="outline" size="sm">
           <Link href={`/applications/${applicationId}/edit`}>
             <FilePenLine size={15} />
-            지원서 보강하기
+            서류 수정 및 재분석
           </Link>
         </Button>
       </div>
@@ -161,16 +161,25 @@ export function ApplicationResult({
         </>
       ) : (
         <>
-          <div className="applicant-score-panel">
-            <div className="applicant-score-main">
+          <div className="analysis-overview">
+            <JDBrief job={job} criteria={criteria} />
+            <div className="analysis-match">
               <span className="eyebrow">YOUR JD MATCH</span>
-              <MatchScore score={evaluation.totalScore} />
-              <p>
-                점수는 현재 지원서와 공고의 연결 정도예요.
-                <br />
-                당신의 가능성 전체를 의미하지 않아요.
-              </p>
+              <MatchScore score={evaluation.totalScore} compact />
+              <p>현재 지원서와 공고의 연결 정도</p>
             </div>
+          </div>
+          <div className="analysis-toolbar">
+            <p>제출한 버전의 근거를 공고와 나란히 확인하세요.</p>
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/jobs/${job.id}/apply`}>
+                다른 버전 선택
+                <ArrowRight size={15} />
+              </Link>
+            </Button>
+          </div>
+          <DocumentAnalysis criteria={criteria} evaluation={evaluation} application={app} />
+          <div className="applicant-score-panel analysis-category-panel">
             <div className="category-scores">
               <h2>경험이 어떻게 연결되었나요?</h2>
               {categories
@@ -245,32 +254,6 @@ export function ApplicationResult({
               minExperience={job.minExperience}
             />
           </details>
-          <section className="result-section">
-            <div className="section-heading">
-              <h2>역량별 분석 근거</h2>
-              <span className="muted text-xs">항목을 눌러 확인하세요</span>
-            </div>
-            <div className="public-item-list">
-              {evaluation.items.map((item) => {
-                const c = criteria.find((c) => c.id === item.criterionId)!;
-                return (
-                  <details key={item.id}>
-                    <summary>
-                      <span>{c.name}</span>
-                      <span className={`level-badge ${item.level.toLowerCase()}`}>
-                        {item.level === 'Unverified' ? '근거 보완' : item.level}
-                      </span>
-                      <span>+</span>
-                    </summary>
-                    <div>
-                      <p>{item.reason}</p>
-                      {item.evidence && <blockquote>“{item.evidence}”</blockquote>}
-                    </div>
-                  </details>
-                );
-              })}
-            </div>
-          </section>
           <div className="bottom-cta">
             <div>
               <h3>다음 지원을 더 자신 있게.</h3>
