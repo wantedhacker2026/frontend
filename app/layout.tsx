@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { ProjectProvider } from '@/lib/projects/store';
 import { StoreProvider } from '@/lib/store';
 import './globals.css';
 export const metadata: Metadata = {
@@ -15,7 +16,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           본문으로 이동
         </a>
         <StoreProvider>
-          <div id="content">{children}</div>
+          <ProjectProvider>
+            <div id="content">{children}</div>
+          </ProjectProvider>
         </StoreProvider>
       </body>
     </html>
