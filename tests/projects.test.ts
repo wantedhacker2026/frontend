@@ -146,3 +146,32 @@ test('unreadable PDF pages are distinguished from missing statements and summary
       .every((s) => s.excerpt !== '프로젝트 경험' && s.excerpt !== '협업 경험'),
   );
 });
+
+test('uploaded PDF headings and aspirations do not become performed experience or collaboration evidence', async () => {
+  const draft = demoDraft(applicant);
+  const originalPages = [
+    {
+      number: 1,
+      text: '프로젝트 및 업무 경험\n사용자의 문제를 해결하는 개발자로 성장하고 있습니다.\nPython과 SQL 기초를 학습하고 분석 프로젝트 튜토리얼을 수강했습니다.',
+    },
+    {
+      number: 2,
+      text: 'TEST 20 / 협업과 추가 경험\n협업 경험\n개인 학습 내용을 기록했습니다.\n지원 동기\n제품의 가치를 높이는 개발에 기여하고 싶습니다.\n본 문서의 이름, 경력, 프로젝트와 성과는 서비스 기능 검증을 위한 가상 데이터입니다.',
+    },
+  ];
+  draft.documents[0].pages = structuredClone(originalPages);
+  const result = await processDraft(draft, applicant, undefined, noop);
+  const analysis = result.revisions[0].analyses[0];
+  const item = (name: string) =>
+    analysis.results.find(
+      (r) => r.criterionId === draft.criteria.find((c) => c.name === name)!.id,
+    )!;
+  assert.equal(item('협업 경험').mentioned, false);
+  assert.equal(item('협업 경험').status, 'missing');
+  assert.equal(item('프로젝트 경험').status, 'review');
+  assert.equal(item('프로젝트 경험').reading, '-');
+  assert.equal(item('프로젝트 경험').sources.length, 1);
+  assert.match(item('프로젝트 경험').sources[0].excerpt, /튜토리얼/);
+  assert.doesNotMatch(analysis.summary, /수행 근거가 확인됩니다/);
+  assert.deepEqual(result.revisions[0].documents[0].pages, originalPages);
+});
