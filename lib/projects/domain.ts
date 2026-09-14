@@ -2,6 +2,7 @@ import { containsKeyword, generateCriteria } from '@/data/mock/criteria';
 import type { CandidateEvaluator } from '@/lib/evaluation/interface';
 import { MockCandidateEvaluator } from '@/lib/evaluation/mock-evaluator';
 import type { Application, EvaluationCriterion, Job } from '@/types';
+import { evidenceLines } from './evidence';
 import {
   projectDBSchema,
   type AnalysisProject,
@@ -125,7 +126,7 @@ export async function processDraft(
   for (const person of people) {
     const documents = draft.documents.filter((d) => d.applicantId === person.id);
     const readable = documents.filter((d) => d.status === 'ready');
-    const text = readable.flatMap((d) => d.pages.map((p) => p.text)).join('\n');
+    const text = readable.flatMap((d) => d.pages.flatMap((p) => evidenceLines(p.text))).join('\n');
     const application: Application = {
       id: crypto.randomUUID(),
       candidateId: person.id,
@@ -150,19 +151,8 @@ export async function processDraft(
       const sources = readable
         .flatMap((d) =>
           d.pages.flatMap((page) =>
-            page.text
-              .split(/\n|(?<=[.!?])\s+/)
-              .filter(
-                (line) =>
-                  ![
-                    '기술 스택',
-                    '프로젝트 경험',
-                    '자기소개',
-                    '지원동기',
-                    '협업 경험',
-                    '추가 경험',
-                  ].includes(line.trim()) && c.keywords.some((k) => containsKeyword(line, k)),
-              )
+            evidenceLines(page.text)
+              .filter((line) => c.keywords.some((k) => containsKeyword(line, k)))
               .map((excerpt) => ({
                 documentId: d.id,
                 filename: d.filename,
