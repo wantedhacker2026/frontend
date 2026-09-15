@@ -448,11 +448,70 @@
   gap: 8px;
   margin-top: 8px;
 }
+.project-criterion-policy {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+}
+.project-criterion-policy label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+.project-criterion-policy input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+}
+.project-criterion-policy select,
+.project-sort select {
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: inherit;
+  max-width: 100%;
+}
+.project-sort {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin: 12px 0;
+}
+.project-fit-row {
+  flex-basis: 100%;
+  order: 2;
+}
+.project-fit-row,
+.project-fit-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.project-fit-summary {
+  padding: 14px;
+  margin-bottom: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.project-comparison th small {
+  display: block;
+  margin-top: 6px;
+  font-weight: normal;
+}
 .project-criterion-edit input {
   width: 100%;
   font-size: 12px;
 }
 .project-criterion-edit button {
+  grid-column: 3;
+  grid-row: 1;
   background: none;
   border: 0;
   color: #7d8ca1;
@@ -737,6 +796,7 @@
   overflow: hidden;
 }
 .project-applicant-row {
+  flex-wrap: wrap;
   border: 0;
   border-bottom: 1px solid #e5ebf5;
   padding: 21px;
@@ -839,6 +899,42 @@
 }
 .project-comparison td[data-label='지원서'] {
   white-space: nowrap;
+}
+.project-keyword-matches {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+}
+.project-keyword-matches strong {
+  display: block;
+  margin-bottom: 4px;
+}
+.project-profile-catalog {
+  margin: 14px 0;
+  padding: 16px;
+  border: 1px solid #dce5f1;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.project-profile-catalog summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.project-profile-catalog section {
+  border-top: 1px solid #dce5f1;
+  padding-top: 12px;
+  margin-top: 12px;
+}
+.project-field select {
+  width: 100%;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #dce5f1;
+  border-radius: 8px;
+  background: white;
+  font: inherit;
 }
 .project-comparison td p {
   color: #73859f;

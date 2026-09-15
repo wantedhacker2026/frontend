@@ -1,0 +1,93 @@
+# 채용담당자 연관 키워드 분석
+
+## 동작
+
+채용담당자의 새 프로젝트 분석과 재분석은 Kotlin 서버의 `POST /api/analysis/keywords`를 사용한다.
+브라우저 → Next.js의 같은 경로 → Kotlin 서버 순서로 호출한다. 이름·생년월일은 요청 필드에 넣지 않고,
+분석에 필요한 기준 ID, 키워드, 읽을 수 있는 서류 본문만 전송한다. 본문에 들어 있는 개인정보는 본문과 함께 전송된다.
+서버는 본문이나 결과를 저장하지 않는다. 화면의 기존 프로젝트 저장·버전 관리 방식은 유지한다.
+
+- 키워드별로 `DIRECT`(직접/동의어), `RELATED`(등록된 연관 기술), `NONE`(미확인)을 반환한다.
+- 하나의 기준에 등록한 키워드는 **OR 조건**이다. 하나라도 직접/연관 일치하면 그 기준에 연관 O를 표시한다.
+- 기술명만 나열하거나 학습 중이라고 적어도 언급으로 인정한다. 이는 실제 수행 능력이나 최종 채용 적합성의 증명이 아니다.
+- `경험 없음`, `never used`, `no ... experience` 같은 명시적 부정 구절은 제외한다.
+- 대소문자·유니코드 전각·별칭을 정규화하고, `SQL`이 `NoSQL`에, `Java`가 `JavaScript`에 잘못 매칭되지 않게 한다.
+- 부정문 처리는 규칙 기반이다. 복잡한 문맥이나 모호한 문장에는 한계가 있어 원문을 함께 검토한다.
+- 직무 선택 시 항목 점수는 배점 × 근거 단계 / 4다. 단순 언급 25%, 역할 50%, 판단 75%, 결과 100%를 반영한다. 직무 미선택 공통 분석은 기존 연관 있음=해당 배점, 없음=0을 유지한다. 핵심 항목 및 균형순은 [균형순 비교](balanced-ranking.md)를 참고한다.
+- 파일을 읽지 못한 경우 `미확인`으로 단정하지 않고 `판독 불가`로 유지한다.
+- 서버 오류 시 분석을 저장하지 않고 입력과 기존 분석을 유지한다. 브라우저 분석으로 자동 대체하지 않는다.
+
+기존 버전은 다시 계산하지 않는다. 재분석하면 현재 규칙 버전(`experience-keywords-v4`)과 키워드 연결 근거를 저장한다.
+직무를 선택한 프로젝트는 채용담당자·구직자 모두 서버 분석을 사용한다. 직무 미선택 구직자 분석 및 `/recruiter/jobs` 아래 기존 채용 데모는 기존 동작을 유지한다.
+
+12개 직무의 상세 목록, 배점, PM 등 근거 수준 평가와 유지보수 방법은 [직무별 평가 목록](job-profiles.md)에 정리했다. 직무별 목록은 `job-profiles-v1`이며, 직무 선택 시 평가 버전에 이 목록 버전도 함께 저장한다.
+
+## 규칙 수정 위치
+
+서버의 `src/main/kotlin/com/wanted/server/analysis/ExperienceKeywordCatalog.kt`:
+
+```kotlin
+val related: Map<String, List<String>> = linkedMapOf(
+    "architecture" to listOf("docker", "kubernetes", "kafka"),
+    "backend" to listOf("kafka", "spring", "django"),
+    "postgresql" to listOf("mysql", "mariadb"),
+)
+```
+
+키는 JD 개념, 값은 인정할 지원서 기술이다. `aliases`에 개념별 표기·별칭을 정의한다.
+MySQL↔PostgreSQL처럼 양방향으로 인정할 경우 양쪽 항목을 명시한다.
+한 단계만 확장하므로 Docker→아키텍처 관계가 아키텍처→Docker 또는 다른 관계로 번지지 않는다.
+규칙 의미를 바꾸면 `version`도 올려 과거 분석과 구별한다.
+
+## 로컬 실행
+
+1. 서버 폴더에서 `./gradlew bootRun`으로 Kotlin 서버를 실행한다(기본 8080).
+2. 웹의 `.env.local`에 `.env.example`의 `WANTEDHACKER_SERVER_URL`을 설정하고 `npm run dev`로 실행한다.
+   개발 모드에서 미설정 시 `http://127.0.0.1:8080`을 사용한다. 운영 모드에서는 명시적 설정이 필요하다.
+3. 채용담당자로 로그인 → 새 프로젝트 → JD/서류 입력 → 분석 → 지원자 선택.
+4. 표에서 키워드별 직접·연관 일치와 원문을 확인한다. 기준을 클릭하면 출처 파일과 페이지를 확인할 수 있다.
+
+컨테이너에서 웹을 실행한다면 `WANTEDHACKER_SERVER_URL`을 컨테이너가 접근할 수 있는 주소로 전달해야 한다
+(macOS 호스트 서버 예: `http://host.docker.internal:8080`). 운영 환경에도 동일한 환경변수를 설정해야 한다.
+이번 작업은 로컬 구현이며 배포나 PR 생성은 포함하지 않는다. 기존 서버의 공개 API/데모 로그인 정책도 변경하지 않는다.
+
+## 요청 예시
+
+```json
+{
+  "criteria": [
+    { "id": "architecture", "keywords": ["아키텍처 설계"] },
+    { "id": "database", "keywords": ["postgresql"] },
+    { "id": "backend", "keywords": ["서버 구현"] }
+  ],
+  "text": "Docker 구현 경험\nMySQL 사용\nKafka 설계 경험"
+}
+```
+
+세 기준 모두 `related: true`, 각 키워드는 `RELATED`와 실제 매칭 기술·원문을 반환한다.
+기준 최대 50개, 기준당 키워드 최대 30개(각 100자), 본문 최대 500,000자다. 빈 본문은 모두 미확인으로 응답한다.
+
+## 고위드 공고용 키워드 확장 (v2)
+
+제공된 공고 전체를 `tests/fixtures/gowid-jd.txt`에 보관했다. 현재 **27개 평가 항목, 66개 키워드**를 추출한다.
+JD 추출은 `data/mock/criteria.ts`, 지원서의 동의어·연관 기술 판정은 서버의 `ExperienceKeywordCatalog.kt`에서 관리한다.
+후보 기준의 이름과 별개로 실제 JD에 등장한 키워드만 요청에 포함한다.
+
+| 범위          | 추출·인정하는 키워드 예시                                                                                     |
+| ------------- | ------------------------------------------------------------------------------------------------------------- |
+| 기술 스택     | Spring Boot, Spring Data JPA, Hibernate, QueryDSL, k8s/Kubernetes, Netty, Google Cloud/GCP                    |
+| 서비스 연동   | Google Workspace/G Suite/Admin SDK, 외부 API, OAuth2, Webhook                                                 |
+| 서비스 도메인 | SaaS, 구독, 계약, 라이선스, 청구·정산·결제, 사용량, 상품·주문·재고·배송·반납                                  |
+| 모델링·정합성 | 데이터 모델·구조, 테이블·스키마 설계, ERD, 트랜잭션, 동시성·분산 락, 멱등성                                   |
+| 검증·운영     | 예외 상황·엣지 케이스, 재시도·서킷 브레이커, JUnit·Mockito·Testcontainers, 배치·CI/CD, Prometheus·Grafana     |
+| 제품 개발     | 요구사항, 협업, 우선순위, 비즈니스 임팩트, 트레이드오프·ADR, AI 도구·Copilot·Cursor·ChatGPT·Claude Code·Codex |
+
+예를 들어 `데이터 정합성 ← 멱등성`, `테스트 ← JUnit`, `자동화 ← GitHub Actions`, `AI 도구 ← Copilot`을 연관 일치로 인정한다.
+Google Workspace 같은 특정 서비스는 별칭으로 직접 일치하며, 일반적인 외부 API 경험을 해당 서비스의 직접 경험으로 바꾸지는 않는다.
+`자격요건` 제목을 필수 기준 구역으로 인식하고, `기술 스택` 제목에서는 구역 판정을 초기화한다.
+경력 3년, Spring Boot 3.0 이상처럼 수치·버전 충족 여부는 별도로 검증하지 않는다. AI 도구의 언급만으로 생성 코드 검증 능력을 입증하지 않는다.
+
+## 검증
+
+- 서버: `./gradlew test` — 실제 HTTP 역직렬화·검증, 세 가지 예시, 역방향/연쇄 매칭 방지, 부정문, 별칭, 부분문자 오인식.
+- 웹: `npm test`, `npm run lint`, `npm run build` — 서버 연결, 잘못된 응답·오류, 원문 페이지, 기존 기록 호환성, 재분석 보존.

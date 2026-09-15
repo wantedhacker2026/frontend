@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { keywordMatchSchema } from '@/lib/evaluation/keyword-contract';
+import { jobProfileIdSchema } from '@/lib/evaluation/job-profiles';
 export const actorSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
@@ -29,6 +31,12 @@ export const personSchema = z.object({
 });
 export type ProjectPerson = z.infer<typeof personSchema>;
 export const criterionSchema = z.object({
+  core: z.boolean().optional(),
+  minimumRatio: z
+    .union([z.literal(0.25), z.literal(0.5), z.literal(0.75), z.literal(1)])
+    .optional(),
+  catalogCriterionId: z.string().optional(),
+  weight: z.number().int().min(1).max(100).optional(),
   id: z.string(),
   name: z.string().min(1),
   keywords: z.array(z.string().min(1)).min(1),
@@ -44,6 +52,10 @@ export const sourceSchema = z.object({
 });
 export type ProjectSource = z.infer<typeof sourceSchema>;
 const resultSchema = z.object({
+  score: z.number().optional(),
+  maxScore: z.number().optional(),
+  evidenceLevel: z.number().int().min(0).max(4).optional(),
+  keywordMatches: z.array(keywordMatchSchema).optional(),
   criterionId: z.string(),
   mentioned: z.boolean(),
   reading: z.enum(['O', '-']),
@@ -53,6 +65,7 @@ const resultSchema = z.object({
 });
 export type ProjectResult = z.infer<typeof resultSchema>;
 const analysisSchema = z.object({
+  evaluatorVersion: z.string().optional(),
   id: z.string(),
   personId: z.string(),
   registeredAt: z.string().optional(),
@@ -82,6 +95,8 @@ export const jdSchema = z.object({
 });
 export type ProjectJD = z.infer<typeof jdSchema>;
 export const projectSchema = z.object({
+  jobProfile: jobProfileIdSchema.optional(),
+  profileCatalogVersion: z.string().optional(),
   id: z.string(),
   ownerId: z.string(),
   role: z.enum(['recruiter', 'applicant']),
@@ -93,6 +108,8 @@ export const projectSchema = z.object({
 });
 export type AnalysisProject = z.infer<typeof projectSchema>;
 export interface ProjectDraft {
+  jobProfile?: z.infer<typeof jobProfileIdSchema>;
+  profileCatalogVersion?: string;
   id: string;
   title: string;
   jd: ProjectJD;

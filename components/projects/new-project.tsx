@@ -12,6 +12,13 @@ import {
   validateDraft,
 } from '@/lib/projects/domain';
 import { demoDraft } from '@/lib/projects/demo';
+import { MAX_ANALYSIS_CRITERIA } from '@/lib/evaluation/limits';
+import {
+  getJobProfile,
+  jobProfiles,
+  jobProfileIdSchema,
+  JOB_PROFILE_CATALOG_VERSION,
+} from '@/lib/evaluation/job-profiles';
 import type { AnalysisProject, ProjectActor, ProjectDraft } from '@/lib/projects/types';
 import { documentSchema, personSchema, criterionSchema, jdSchema } from '@/lib/projects/types';
 import { z } from 'zod';
@@ -20,6 +27,8 @@ import { Dialog } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/states';
 import { DocumentUpload } from './document-upload';
 const draftSchema = z.object({
+  jobProfile: jobProfileIdSchema.optional(),
+  profileCatalogVersion: z.string().optional(),
   id: z.string(),
   title: z.string(),
   jd: jdSchema,
@@ -130,8 +139,9 @@ function ProjectForm({
     setDirty(true);
   }
   function changeText(text: string) {
-    update({ jd: { ...draft.jd, text }, criteria: deriveCriteria(text) });
+    update({ jd: { ...draft.jd, text }, criteria: deriveCriteria(text, draft.jobProfile) });
   }
+  const selectedProfile = getJobProfile(draft.jobProfile);
   let validation = '';
   try {
     if (actor) validateDraft(draft, actor);
@@ -229,6 +239,63 @@ function ProjectForm({
               readOnly={Boolean(previous)}
             />
           </label>
+          <label className="project-field">
+            분석 직무
+            <select
+              value={draft.jobProfile ?? ''}
+              disabled={Boolean(previous)}
+              onChange={(e) => {
+                const jobProfile = e.target.value
+                  ? jobProfileIdSchema.parse(e.target.value)
+                  : undefined;
+                update({
+                  jobProfile,
+                  profileCatalogVersion: jobProfile ? JOB_PROFILE_CATALOG_VERSION : undefined,
+                  criteria: deriveCriteria(draft.jd.text, jobProfile),
+                });
+              }}
+            >
+              <option value="">공통 키워드 분석</option>
+              {jobProfiles.map((profile) => (
+                <option key={profile.id} value={profile.id}>
+                  {profile.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="project-notice">
+            직무를 바꾸면 평가 기준이 해당 직무와 JD를 기준으로 다시 추출됩니다.
+            {selectedProfile
+              ? ' 키워드 언급·역할·판단·결과의 작성 근거를 0~4단계로 분류합니다.'
+              : ' 직접 또는 연관 키워드의 언급을 확인합니다.'}
+          </p>
+          {selectedProfile && (
+            <details className="project-profile-catalog">
+              <summary>
+                {selectedProfile.name} 세부 평가 목록 · {selectedProfile.criteria.length}개
+              </summary>
+              <p>
+                JD에 언급된 항목만 평가합니다. 표시한 기본 배점은 선택된 항목끼리 100점으로
+                환산합니다.
+              </p>
+              {selectedProfile.criteria.map((criterion) => (
+                <section key={criterion.id}>
+                  <strong>
+                    {criterion.name} · 기본 {criterion.weight}점
+                  </strong>
+                  <p>{criterion.evidenceGuide}</p>
+                  <p>키워드: {criterion.keywords.join(', ')}</p>
+                  <p>연관 경험: {criterion.relatedKeywords.join(', ')}</p>
+                  {criterion.keywordRelations &&
+                    Object.entries(criterion.keywordRelations).map(([keyword, related]) => (
+                      <p key={keyword}>
+                        {keyword}의 개별 연관 목록: {related.join(', ')}
+                      </p>
+                    ))}
+                </section>
+              ))}
+            </details>
+          )}
           {!previous && (
             <div className="project-input-tabs" aria-label="JD 입력 방식">
               {(
@@ -340,7 +407,15 @@ function ProjectForm({
           </label>
           <details className="project-criteria-editor" open={draft.criteria.length === 0}>
             <summary>추출한 평가 기준 확인 · {draft.criteria.length}개</summary>
-            <p>키워드 기반 초안입니다. 공고에 맞게 기준과 검색 키워드를 수정한 뒤 분석해 주세요.</p>
+            <p>
+              키워드 기반 초안입니다. 공고에 맞게 기준과 검색 키워드를 수정한 뒤 분석해 주세요. 직무
+              목록에 없는 조건은 평가 기준 추가로 등록할 수 있습니다.
+            </p>
+            <p>
+              핵심 항목을 직접 지정하고 충족 기준을 선택하세요. 기본 50%는 직접 수행한 역할 이상의
+              근거입니다. 균형순은 핵심 충족 수 → 전체 항목 충족률 → 총점 순입니다. 기준을 수정한 뒤
+              JD를 바꾸면 다시 추출됩니다.
+            </p>
             {draft.criteria.map((c) => (
               <div className="project-criterion-edit" key={c.id}>
                 <input
@@ -375,6 +450,49 @@ function ProjectForm({
                     })
                   }
                 />
+                <div className="project-criterion-policy">
+                  <label>
+                    <input
+                      type="checkbox"
+                      aria-label={`${c.name} 핵심 항목`}
+                      checked={c.core ?? false}
+                      disabled={Boolean(previous)}
+                      onChange={(e) =>
+                        update({
+                          criteria: draft.criteria.map((v) =>
+                            v.id === c.id ? { ...v, core: e.target.checked } : v,
+                          ),
+                        })
+                      }
+                    />
+                    핵심 항목
+                  </label>
+                  <label>
+                    충족 기준
+                    <select
+                      aria-label={`${c.name} 충족 기준`}
+                      value={c.minimumRatio ?? 0.5}
+                      disabled={Boolean(previous)}
+                      onChange={(e) =>
+                        update({
+                          criteria: draft.criteria.map((v) =>
+                            v.id === c.id
+                              ? {
+                                  ...v,
+                                  minimumRatio: Number(e.target.value) as 0.25 | 0.5 | 0.75 | 1,
+                                }
+                              : v,
+                          ),
+                        })
+                      }
+                    >
+                      <option value={0.25}>25% · 언급</option>
+                      <option value={0.5}>50% · 역할</option>
+                      <option value={0.75}>75% · 판단</option>
+                      <option value={1}>100% · 결과</option>
+                    </select>
+                  </label>
+                </div>
                 {!previous && (
                   <button
                     aria-label={`${c.name} 기준 제거`}
@@ -392,7 +510,7 @@ function ProjectForm({
               <button
                 type="button"
                 className="project-text-button"
-                disabled={draft.criteria.length >= 20}
+                disabled={draft.criteria.length >= MAX_ANALYSIS_CRITERIA}
                 onClick={() =>
                   update({
                     criteria: [
@@ -466,7 +584,9 @@ function ProjectForm({
             {validation ||
               (!grouped && actor?.role === 'recruiter'
                 ? '지원자별 파일 묶음을 확인해 주세요.'
-                : '원문을 바탕으로 한 규칙 기반 데모 분석입니다.')}
+                : actor?.role === 'recruiter'
+                  ? '서버에서 직접·연관 키워드를 확인하고 연결된 원문을 표시합니다.'
+                  : '원문을 바탕으로 한 규칙 기반 데모 분석입니다.')}
           </p>
         </div>
         {actor ? (
