@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/states';
 import { MatchScore } from '@/components/evaluation/score';
+import { InterviewPanel } from './interview';
+import { packetKey, stageNames } from '@/lib/interview/domain';
 import type {
   AnalysisProject,
   ProjectAnalysis,
@@ -53,6 +55,7 @@ function ProjectResultContent({ project }: { project: AnalysisProject }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [order, setOrder] = useState('balanced');
+  const [tab, setTab] = useState<'analysis' | 'interview'>('analysis');
   const recruiter = project.role === 'recruiter';
   const chosen = revision.analyses.find((a) => a.id === selected);
   const sorted = sortAnalyses(revision.analyses, project.criteria, order);
@@ -184,7 +187,10 @@ function ProjectResultContent({ project }: { project: AnalysisProject }) {
                 <button
                   key={a.id}
                   className="project-applicant-row"
-                  onClick={() => setSelected(a.id)}
+                  onClick={() => {
+                    setSelected(a.id);
+                    setTab('analysis');
+                  }}
                   aria-haspopup="dialog"
                 >
                   <span className="project-person-avatar" aria-hidden="true">
@@ -199,7 +205,16 @@ function ProjectResultContent({ project }: { project: AnalysisProject }) {
                     <FitMetrics project={project} analysis={a} />
                   </span>
                   <span className="project-row-status">
-                    {a.results.every((r) => r.status === 'unreadable') ? '판독 불가' : '요약 완료'}
+                    {(() => {
+                      const packet = project.interviews?.find(
+                        (p) => p.key === packetKey(revision.id, a.id),
+                      );
+                      return packet
+                        ? stageNames[packet.stage]
+                        : a.results.every((r) => r.status === 'unreadable')
+                          ? '판독 불가'
+                          : '요약 완료';
+                    })()}
                   </span>
                   <ArrowRight size={16} />
                 </button>
@@ -221,17 +236,43 @@ function ProjectResultContent({ project }: { project: AnalysisProject }) {
           >
             {chosen && (
               <>
-                <ProjectAnalysisTable project={project} revision={revision} analysis={chosen} />
-                <section className="project-one-line">
-                  <h3>지원자 서류 한 줄 요약</h3>
-                  <p>{chosen.summary}</p>
-                </section>
+                <div className="project-table-filters" aria-label="지원자 상세 메뉴">
+                  <button aria-pressed={tab === 'analysis'} onClick={() => setTab('analysis')}>
+                    서류 분석
+                  </button>
+                  <button aria-pressed={tab === 'interview'} onClick={() => setTab('interview')}>
+                    면접 준비
+                  </button>
+                </div>
+                {tab === 'interview' ? (
+                  <InterviewPanel
+                    key={`${revision.id}:${chosen.id}`}
+                    project={project}
+                    revision={revision}
+                    analysis={chosen}
+                  />
+                ) : (
+                  <>
+                    <ProjectAnalysisTable project={project} revision={revision} analysis={chosen} />
+                    <section className="project-one-line">
+                      <h3>지원자 서류 한 줄 요약</h3>
+                      <p>{chosen.summary}</p>
+                    </section>
+                    <Button onClick={() => setTab('interview')}>면접 준비 열기</Button>
+                  </>
+                )}
               </>
             )}
           </Dialog>
         </>
       ) : revision.analyses[0] ? (
         <>
+          <InterviewPanel
+            key={`${revision.id}:${revision.analyses[0].id}`}
+            project={project}
+            revision={revision}
+            analysis={revision.analyses[0]}
+          />
           <div className="project-analysis-score">
             <MatchScore score={revision.analyses[0].score} compact />
             <p>{revision.analyses[0].summary}</p>

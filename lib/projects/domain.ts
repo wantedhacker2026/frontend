@@ -302,7 +302,8 @@ export function saveProject(
     throw new Error('접근할 수 없는 프로젝트입니다.');
   if ((current?.revisions.length ?? 0) !== expectedRevisionCount)
     throw new Error('다른 분석이 먼저 저장됐습니다. 최신 결과를 열고 다시 시도해 주세요.');
-  return { ...db, projects: [...db.projects.filter((p) => p.id !== project.id), project] };
+  const saved = { ...project, ...(current?.interviews ? { interviews: current.interviews } : {}) };
+  return { ...db, projects: [...db.projects.filter((p) => p.id !== project.id), saved] };
 }
 export function revisionDraft(project: AnalysisProject): ProjectDraft {
   const revision = project.revisions.at(-1)!;

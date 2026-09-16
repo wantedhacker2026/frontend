@@ -26,6 +26,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/states';
 import { DocumentUpload } from './document-upload';
+import { JDInterviewPreview } from './interview';
 const draftSchema = z.object({
   jobProfile: jobProfileIdSchema.optional(),
   profileCatalogVersion: z.string().optional(),
@@ -532,6 +533,7 @@ function ProjectForm({
             )}
           </details>
         </section>
+        {actor?.role === 'applicant' && <JDInterviewPreview draft={draft} />}
         <section className="project-form-section">
           <div className="project-section-title">
             <span>02</span>

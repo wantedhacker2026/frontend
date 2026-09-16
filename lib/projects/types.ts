@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { packetSchema } from '@/lib/interview/types';
 import { keywordMatchSchema } from '@/lib/evaluation/keyword-contract';
 import { jobProfileIdSchema } from '@/lib/evaluation/job-profiles';
 export const actorSchema = z.object({
@@ -95,6 +96,7 @@ export const jdSchema = z.object({
 });
 export type ProjectJD = z.infer<typeof jdSchema>;
 export const projectSchema = z.object({
+  interviews: z.array(packetSchema).optional(),
   jobProfile: jobProfileIdSchema.optional(),
   profileCatalogVersion: z.string().optional(),
   id: z.string(),

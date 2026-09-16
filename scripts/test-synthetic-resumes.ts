@@ -5,6 +5,8 @@ import { JOB_PROFILE_CATALOG_VERSION } from '../lib/evaluation/job-profiles';
 import { ServerKeywordEvaluator } from '../lib/evaluation/server-keyword-evaluator';
 import type { ProjectActor, ProjectDraft } from '../lib/projects/types';
 import { fitSummary, sortAnalyses } from '../lib/projects/fit';
+import { buildInterviewInput, templateQuestions } from '../lib/interview/domain';
+import { generationSchema } from '../lib/interview/types';
 
 // Run against a running local web + Kotlin server, never a mocked response.
 // node --import tsx scripts/test-synthetic-resumes.ts http://127.0.0.1:3100
@@ -81,6 +83,31 @@ async function main() {
     );
     const project = await processDraft(draft, actor, undefined, () => {}, evaluator);
     const analysis = project.revisions[0].analyses[0];
+    for (const role of ['applicant', 'recruiter'] as const) {
+      const input = buildInterviewInput({ ...project, role }, project.revisions[0], analysis);
+      const response = await fetch(new URL('/api/interviews', origin), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Origin: new URL(origin).origin },
+        body: JSON.stringify(input),
+      });
+      assert.equal(response.status, 200, `${scenario.key}/${role}: interview endpoint`);
+      const interview = generationSchema.parse(await response.json());
+      assert.equal(interview.questions.length, 7);
+      assert.equal(interview.questions.filter((q) => q.kind === 'common').length, 3);
+      assert.equal(interview.questions.filter((q) => q.kind === 'personal').length, 4);
+      for (const question of interview.questions) {
+        assert.ok(input.topics.some((t) => t.id === question.topicId));
+        for (const source of question.sources) assert.ok(text.includes(source.excerpt));
+      }
+      if (role === 'recruiter')
+        assert.deepEqual(
+          interview.questions.filter((q) => q.kind === 'common'),
+          templateQuestions(input).questions.filter((q) => q.kind === 'common'),
+        );
+      console.log(
+        `PASS interview ${scenario.key}/${role}: 3 common + 4 personal, ${interview.generation}`,
+      );
+    }
     const rows = analysis.results.map((result, i) => ({
       criterion: draft.criteria[i].catalogCriterionId,
       name: draft.criteria[i].name,

@@ -2,6 +2,8 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { PROJECT_STORAGE_KEY, ownedProjects, parseProjects, saveProject } from './domain';
 import type { AnalysisProject, ProjectActor, ProjectDB } from './types';
+import { saveInterview } from '@/lib/interview/domain';
+import type { InterviewPacket } from '@/lib/interview/types';
 const empty: ProjectDB = { version: 1, actor: null, projects: [] };
 interface ProjectStore {
   actor: ProjectActor | null;
@@ -11,6 +13,7 @@ interface ProjectStore {
   login: (actor: ProjectActor) => void;
   logout: () => void;
   commitProject: (project: AnalysisProject, expected: number) => void;
+  commitInterview: (projectId: string, packet: InterviewPacket, expected: number) => void;
 }
 const Context = createContext<ProjectStore | null>(null);
 export function ProjectProvider({ children }: { children: ReactNode }) {
@@ -59,6 +62,11 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         error,
         login: (actor) => persist({ ...ref.current, actor }),
         logout: () => persist({ ...ref.current, actor: null }),
+        commitInterview: (projectId, packet, expected) => {
+          const raw = localStorage.getItem(PROJECT_STORAGE_KEY);
+          const latest = raw ? parseProjects(raw) : ref.current;
+          persist(saveInterview(latest, projectId, packet, expected));
+        },
         commitProject: (project, expected) => {
           const raw = localStorage.getItem(PROJECT_STORAGE_KEY);
           const latest = raw ? parseProjects(raw) : ref.current;
