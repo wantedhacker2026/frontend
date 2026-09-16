@@ -1,0 +1,942 @@
+{
+  "version": "job-profiles-v1",
+  "profiles": [
+    {
+      "id": "backend",
+      "name": "백엔드 개발",
+      "scoringMode": "technical-evidence",
+      "criteria": [
+        {
+          "id": "language",
+          "name": "서버 언어·프레임워크",
+          "weight": 15,
+          "keywords": [
+            "Java",
+            "Kotlin",
+            "Spring",
+            "Spring Boot",
+            "Python",
+            "Django",
+            "Node.js",
+            "Go",
+            "백엔드 개발",
+            "서버 구현"
+          ],
+          "relatedKeywords": ["NestJS", "FastAPI", "Express", "Netty", "서버 개발"],
+          "evidenceGuide": "사용 언어와 직접 구현한 서버 기능을 확인합니다."
+        },
+        {
+          "id": "api",
+          "name": "API·외부 서비스 연동",
+          "weight": 15,
+          "keywords": [
+            "REST API",
+            "RESTful",
+            "API 설계",
+            "API 개발",
+            "API를 설계",
+            "외부 서비스",
+            "Google Workspace"
+          ],
+          "relatedKeywords": ["OAuth2", "Webhook", "gRPC", "GraphQL", "Google Admin SDK", "웹훅"],
+          "evidenceGuide": "인증, 외부 API 연동과 실패 처리를 확인합니다."
+        },
+        {
+          "id": "database",
+          "name": "데이터 모델·영속성",
+          "weight": 15,
+          "keywords": [
+            "데이터 모델",
+            "데이터 구조",
+            "테이블 설계",
+            "RDBMS",
+            "MySQL",
+            "PostgreSQL",
+            "JPA",
+            "데이터를 설계",
+            "테이블을 직접 설계"
+          ],
+          "relatedKeywords": [
+            "ERD",
+            "Hibernate",
+            "QueryDSL",
+            "ORM",
+            "스키마 설계",
+            "인덱스",
+            "SQL"
+          ],
+          "evidenceGuide": "데이터 구조와 저장·조회 방식을 설계한 근거를 확인합니다."
+        },
+        {
+          "id": "domain",
+          "name": "비즈니스 로직·서비스 도메인",
+          "weight": 15,
+          "keywords": [
+            "비즈니스 로직",
+            "요구사항",
+            "SaaS",
+            "구독 서비스",
+            "계약",
+            "라이선스",
+            "청구",
+            "상품",
+            "재고",
+            "주문"
+          ],
+          "relatedKeywords": ["DDD", "도메인 모델", "정산", "결제", "배송", "반납", "사용량"],
+          "evidenceGuide": "업무 규칙을 데이터와 로직으로 구현한 경험을 확인합니다."
+        },
+        {
+          "id": "consistency",
+          "name": "정합성·예외 처리",
+          "weight": 10,
+          "keywords": ["데이터 정합성", "무결성", "동시성", "예외 상황", "엣지 케이스"],
+          "relatedKeywords": [
+            "트랜잭션",
+            "멱등성",
+            "분산 락",
+            "낙관적 락",
+            "재시도",
+            "서킷 브레이커"
+          ],
+          "evidenceGuide": "중복 요청, 동시 처리 및 장애 상황의 대응을 확인합니다."
+        },
+        {
+          "id": "testing",
+          "name": "테스트·코드 검증",
+          "weight": 10,
+          "keywords": ["테스트", "코드 검증", "코드의 정확성", "AI 도구", "생성된 코드"],
+          "relatedKeywords": [
+            "JUnit",
+            "Mockito",
+            "Testcontainers",
+            "Copilot",
+            "코드 리뷰",
+            "통합 테스트"
+          ],
+          "evidenceGuide": "테스트와 생성 코드 검토에 관한 언급을 확인합니다."
+        },
+        {
+          "id": "infrastructure",
+          "name": "배포·분산 시스템",
+          "weight": 10,
+          "keywords": [
+            "Docker",
+            "k8s",
+            "Kubernetes",
+            "Kafka",
+            "Redis",
+            "Google Cloud",
+            "아키텍처 설계"
+          ],
+          "relatedKeywords": ["GCP", "AWS", "CI/CD", "RabbitMQ", "컨테이너", "배치"],
+          "evidenceGuide": "배포 환경, 메시징과 캐시의 사용 경험을 확인합니다."
+        },
+        {
+          "id": "operations",
+          "name": "운영·성과 개선",
+          "weight": 10,
+          "keywords": [
+            "운영 결과",
+            "운영 개선",
+            "운영 업무",
+            "자동화",
+            "고객 반응",
+            "처리 결과",
+            "트레이드오프",
+            "우선순위"
+          ],
+          "relatedKeywords": [
+            "Prometheus",
+            "Grafana",
+            "GitHub Actions",
+            "Spring Batch",
+            "ADR",
+            "장애 대응"
+          ],
+          "evidenceGuide": "운영 중 문제 해결, 의사결정과 개선 근거를 확인합니다."
+        }
+      ]
+    },
+    {
+      "id": "frontend",
+      "name": "프론트엔드 개발",
+      "scoringMode": "technical-evidence",
+      "criteria": [
+        {
+          "id": "web",
+          "name": "웹 언어·프레임워크",
+          "weight": 15,
+          "keywords": ["JavaScript", "TypeScript", "React", "Vue", "Angular", "프론트엔드 개발"],
+          "relatedKeywords": ["Next.js", "Nuxt", "Svelte", "웹 애플리케이션"],
+          "evidenceGuide": "구현한 웹 화면과 프레임워크 활용을 확인합니다."
+        },
+        {
+          "id": "rendering",
+          "name": "렌더링·컴포넌트 설계",
+          "weight": 15,
+          "keywords": ["컴포넌트 설계", "렌더링", "SSR", "SSG", "상태 관리"],
+          "relatedKeywords": ["React Query", "Zustand", "Redux", "Pinia", "서버 컴포넌트"],
+          "evidenceGuide": "컴포넌트 구조와 상태·렌더링 선택 근거를 확인합니다."
+        },
+        {
+          "id": "integration",
+          "name": "API·데이터 연동",
+          "weight": 15,
+          "keywords": ["API 연동", "인증", "데이터 fetching", "실시간 통신"],
+          "relatedKeywords": [
+            "REST API",
+            "GraphQL",
+            "OAuth2",
+            "WebSocket",
+            "Axios",
+            "TanStack Query"
+          ],
+          "evidenceGuide": "서버 데이터의 조회·갱신과 오류 처리를 확인합니다."
+        },
+        {
+          "id": "interface",
+          "name": "UI·접근성",
+          "weight": 15,
+          "keywords": ["반응형", "웹 접근성", "CSS", "UI 구현", "디자인 시스템"],
+          "relatedKeywords": ["WCAG", "ARIA", "Tailwind", "Storybook", "시맨틱 HTML"],
+          "evidenceGuide": "다양한 화면 크기와 접근성을 고려한 UI 구현을 확인합니다."
+        },
+        {
+          "id": "performance",
+          "name": "웹 성능",
+          "weight": 10,
+          "keywords": ["웹 성능", "로딩 최적화", "Core Web Vitals", "SEO"],
+          "relatedKeywords": [
+            "Lighthouse",
+            "LCP",
+            "INP",
+            "코드 스플리팅",
+            "번들 최적화",
+            "이미지 최적화"
+          ],
+          "evidenceGuide": "측정 지표와 성능 개선 내용을 확인합니다."
+        },
+        {
+          "id": "testing",
+          "name": "테스트·품질",
+          "weight": 10,
+          "keywords": ["테스트", "E2E", "코드 품질"],
+          "relatedKeywords": ["Playwright", "Cypress", "Vitest", "Jest", "Testing Library"],
+          "evidenceGuide": "자동화 테스트와 회귀 방지 경험을 확인합니다."
+        },
+        {
+          "id": "release",
+          "name": "빌드·배포",
+          "weight": 10,
+          "keywords": ["빌드", "배포", "CI/CD", "패키지 관리"],
+          "relatedKeywords": ["Vite", "Webpack", "GitHub Actions", "Vercel", "모노레포"],
+          "evidenceGuide": "빌드와 릴리스 운영 경험을 확인합니다."
+        },
+        {
+          "id": "collaboration",
+          "name": "협업·개발 운영",
+          "weight": 10,
+          "keywords": ["협업", "코드 리뷰", "요구사항", "문서화"],
+          "relatedKeywords": ["Figma 핸드오프", "PR 리뷰", "기술 문서", "스프린트"],
+          "evidenceGuide": "디자인·백엔드와 조율한 경험을 확인합니다."
+        }
+      ]
+    },
+    {
+      "id": "mobile",
+      "name": "모바일 개발",
+      "scoringMode": "technical-evidence",
+      "criteria": [
+        {
+          "id": "platform",
+          "name": "모바일 플랫폼",
+          "weight": 20,
+          "keywords": ["iOS", "Android", "모바일 개발", "크로스플랫폼"],
+          "relatedKeywords": [
+            "Swift",
+            "Kotlin",
+            "Flutter",
+            "React Native",
+            "SwiftUI",
+            "Jetpack Compose"
+          ],
+          "evidenceGuide": "구현한 플랫폼과 앱 기능을 확인합니다."
+        },
+        {
+          "id": "architecture",
+          "name": "앱 구조·상태 관리",
+          "weight": 15,
+          "keywords": ["앱 아키텍처", "상태 관리", "모듈화", "클린 아키텍처"],
+          "relatedKeywords": ["MVVM", "MVI", "Combine", "Coroutines", "Riverpod", "의존성 주입"],
+          "evidenceGuide": "화면·상태·데이터 계층의 구조를 확인합니다."
+        },
+        {
+          "id": "network",
+          "name": "네트워크·로컬 데이터",
+          "weight": 15,
+          "keywords": ["API 연동", "오프라인", "로컬 저장", "데이터 동기화"],
+          "relatedKeywords": ["Retrofit", "URLSession", "Room", "Core Data", "SQLite", "GraphQL"],
+          "evidenceGuide": "네트워크 실패와 데이터 동기화를 다룬 경험을 확인합니다."
+        },
+        {
+          "id": "experience",
+          "name": "모바일 UX·기기 기능",
+          "weight": 15,
+          "keywords": ["모바일 UX", "접근성", "푸시 알림", "기기 기능"],
+          "relatedKeywords": ["딥링크", "FCM", "APNs", "카메라", "위치 서비스", "애니메이션"],
+          "evidenceGuide": "플랫폼 특성과 기기 기능을 반영한 경험을 확인합니다."
+        },
+        {
+          "id": "performance",
+          "name": "성능·안정성",
+          "weight": 15,
+          "keywords": ["앱 성능", "메모리", "크래시", "안정성"],
+          "relatedKeywords": ["Instruments", "ANR", "Crashlytics", "프로파일링", "배터리 최적화"],
+          "evidenceGuide": "성능·크래시 측정과 개선 경험을 확인합니다."
+        },
+        {
+          "id": "testing",
+          "name": "앱 테스트",
+          "weight": 10,
+          "keywords": ["테스트", "UI 테스트", "회귀 테스트"],
+          "relatedKeywords": ["XCTest", "Espresso", "Appium", "Detox", "단위 테스트"],
+          "evidenceGuide": "플랫폼별 테스트와 회귀 방지를 확인합니다."
+        },
+        {
+          "id": "release",
+          "name": "스토어·릴리스 운영",
+          "weight": 10,
+          "keywords": ["앱 출시", "스토어 배포", "릴리스", "인앱 결제"],
+          "relatedKeywords": ["App Store", "Google Play", "Fastlane", "TestFlight", "단계적 배포"],
+          "evidenceGuide": "심사·배포·결제 연동 및 출시 후 대응을 확인합니다."
+        }
+      ]
+    },
+    {
+      "id": "data-ai",
+      "name": "데이터·AI",
+      "scoringMode": "technical-evidence",
+      "criteria": [
+        {
+          "id": "query",
+          "name": "데이터 처리·프로그래밍",
+          "weight": 15,
+          "keywords": ["SQL", "Python", "데이터 처리", "데이터 추출"],
+          "relatedKeywords": ["Pandas", "NumPy", "R", "Polars", "BigQuery"],
+          "evidenceGuide": "데이터 추출·정제와 분석 코드를 확인합니다."
+        },
+        {
+          "id": "pipeline",
+          "name": "데이터 파이프라인",
+          "weight": 20,
+          "keywords": ["데이터 파이프라인", "ETL", "ELT", "데이터 엔지니어링"],
+          "relatedKeywords": ["Airflow", "Spark", "dbt", "Kafka", "배치", "스트리밍"],
+          "evidenceGuide": "수집·변환·적재와 파이프라인 운영을 확인합니다."
+        },
+        {
+          "id": "analysis",
+          "name": "통계·분석·시각화",
+          "weight": 15,
+          "keywords": ["데이터 분석", "통계", "가설 검정", "시각화", "지표 분석"],
+          "relatedKeywords": ["A/B 테스트", "회귀 분석", "Tableau", "Power BI", "퍼널 분석"],
+          "evidenceGuide": "분석 질문, 방법과 해석한 결과를 확인합니다."
+        },
+        {
+          "id": "model",
+          "name": "머신러닝·모델 평가",
+          "weight": 15,
+          "keywords": ["머신러닝", "딥러닝", "모델 학습", "모델 평가"],
+          "relatedKeywords": [
+            "PyTorch",
+            "TensorFlow",
+            "scikit-learn",
+            "XGBoost",
+            "교차 검증",
+            "F1"
+          ],
+          "evidenceGuide": "학습 데이터, 모델 선택과 평가 근거를 확인합니다."
+        },
+        {
+          "id": "llm",
+          "name": "LLM·AI 응용",
+          "weight": 15,
+          "keywords": ["LLM", "생성형 AI", "RAG", "문서 자동화", "자연어 처리"],
+          "relatedKeywords": ["OCR", "임베딩", "벡터 검색", "파인튜닝", "프롬프트", "모델 평가셋"],
+          "evidenceGuide": "문서 처리·생성형 AI 기능과 품질 검증을 확인합니다."
+        },
+        {
+          "id": "mlops",
+          "name": "MLOps·서비스화",
+          "weight": 10,
+          "keywords": ["MLOps", "모델 배포", "추론", "모델 모니터링"],
+          "relatedKeywords": ["MLflow", "Kubeflow", "Triton", "모델 드리프트", "피처 스토어"],
+          "evidenceGuide": "모델의 배포·관측·재학습 운영을 확인합니다."
+        },
+        {
+          "id": "governance",
+          "name": "데이터 품질·보안",
+          "weight": 10,
+          "keywords": ["데이터 품질", "데이터 거버넌스", "개인정보", "데이터 정합성"],
+          "relatedKeywords": [
+            "데이터 계보",
+            "마스킹",
+            "접근 제어",
+            "Great Expectations",
+            "데이터 검증"
+          ],
+          "evidenceGuide": "데이터 신뢰성, 접근 권한과 개인정보 처리를 확인합니다."
+        }
+      ]
+    },
+    {
+      "id": "infra-devops",
+      "name": "인프라·DevOps",
+      "scoringMode": "technical-evidence",
+      "criteria": [
+        {
+          "id": "cloud",
+          "name": "클라우드·IaC",
+          "weight": 20,
+          "keywords": ["클라우드", "인프라 구축", "IaC", "Google Cloud"],
+          "relatedKeywords": ["AWS", "GCP", "Azure", "Terraform", "Pulumi", "CloudFormation"],
+          "evidenceGuide": "인프라 구성과 코드 기반 관리를 확인합니다."
+        },
+        {
+          "id": "container",
+          "name": "컨테이너·오케스트레이션",
+          "weight": 15,
+          "keywords": ["컨테이너", "Kubernetes", "k8s", "Docker"],
+          "relatedKeywords": ["Helm", "GKE", "EKS", "AKS", "서비스 메시"],
+          "evidenceGuide": "컨테이너 배포·확장·운영 경험을 확인합니다."
+        },
+        {
+          "id": "delivery",
+          "name": "CI/CD·배포 자동화",
+          "weight": 15,
+          "keywords": ["CI/CD", "배포 자동화", "지속적 배포"],
+          "relatedKeywords": ["GitHub Actions", "Jenkins", "Argo CD", "GitLab CI", "카나리 배포"],
+          "evidenceGuide": "빌드·배포 파이프라인과 롤백을 확인합니다."
+        },
+        {
+          "id": "reliability",
+          "name": "신뢰성·장애 대응",
+          "weight": 20,
+          "keywords": ["SRE", "신뢰성", "장애 대응", "고가용성"],
+          "relatedKeywords": ["SLO", "SLI", "에러 버짓", "온콜", "재해 복구", "포스트모템"],
+          "evidenceGuide": "서비스 목표, 장애 복구와 재발 방지를 확인합니다."
+        },
+        {
+          "id": "observability",
+          "name": "관측·모니터링",
+          "weight": 10,
+          "keywords": ["모니터링", "관측성", "로그", "분산 추적"],
+          "relatedKeywords": ["Prometheus", "Grafana", "Datadog", "OpenTelemetry", "ELK"],
+          "evidenceGuide": "지표·로그·추적으로 문제를 진단한 경험을 확인합니다."
+        },
+        {
+          "id": "security",
+          "name": "네트워크·보안",
+          "weight": 10,
+          "keywords": ["네트워크", "보안", "접근 제어", "인증서"],
+          "relatedKeywords": ["VPC", "IAM", "TLS", "방화벽", "시크릿 관리", "VPN"],
+          "evidenceGuide": "네트워크와 권한·비밀정보 보호를 확인합니다."
+        },
+        {
+          "id": "efficiency",
+          "name": "용량·비용 최적화",
+          "weight": 10,
+          "keywords": ["용량 계획", "비용 최적화", "성능 튜닝", "FinOps"],
+          "relatedKeywords": ["오토스케일링", "리소스 최적화", "부하 테스트", "비용 절감"],
+          "evidenceGuide": "수요·성능·비용의 균형을 확인합니다."
+        }
+      ]
+    },
+    {
+      "id": "qa",
+      "name": "QA·테스트",
+      "scoringMode": "technical-evidence",
+      "criteria": [
+        {
+          "id": "strategy",
+          "name": "품질 전략·계획",
+          "weight": 20,
+          "keywords": ["테스트 전략", "테스트 계획", "품질 관리", "QA"],
+          "relatedKeywords": ["리스크 기반 테스트", "테스트 범위", "품질 게이트", "테스트 일정"],
+          "evidenceGuide": "제품 위험과 테스트 범위를 정한 근거를 확인합니다."
+        },
+        {
+          "id": "cases",
+          "name": "요구사항·테스트 설계",
+          "weight": 20,
+          "keywords": ["테스트 케이스", "테스트 설계", "요구사항 검증"],
+          "relatedKeywords": ["경계값 분석", "동등 분할", "탐색적 테스트", "추적성 매트릭스"],
+          "evidenceGuide": "요구사항과 경계·예외 조건의 검증을 확인합니다."
+        },
+        {
+          "id": "automation",
+          "name": "테스트 자동화",
+          "weight": 20,
+          "keywords": ["테스트 자동화", "E2E", "API 테스트"],
+          "relatedKeywords": [
+            "Playwright",
+            "Cypress",
+            "Selenium",
+            "Appium",
+            "REST Assured",
+            "Postman"
+          ],
+          "evidenceGuide": "자동화 범위와 유지보수 경험을 확인합니다."
+        },
+        {
+          "id": "defects",
+          "name": "결함 분석·관리",
+          "weight": 15,
+          "keywords": ["결함 관리", "버그 분석", "재현", "원인 분석"],
+          "relatedKeywords": ["버그 리포트", "심각도", "우선순위", "회귀 테스트", "결함 추적"],
+          "evidenceGuide": "재현 조건, 영향과 해결 추적을 확인합니다."
+        },
+        {
+          "id": "nonfunctional",
+          "name": "성능·비기능 검증",
+          "weight": 10,
+          "keywords": ["성능 테스트", "부하 테스트", "보안 테스트", "접근성 테스트"],
+          "relatedKeywords": ["JMeter", "k6", "Locust", "OWASP", "WCAG"],
+          "evidenceGuide": "성능·보안·접근성 검증 경험을 확인합니다."
+        },
+        {
+          "id": "release",
+          "name": "검수·출시 품질",
+          "weight": 10,
+          "keywords": ["인수 테스트", "출시 검증", "UAT", "안정화"],
+          "relatedKeywords": ["고객 검수", "릴리스 체크리스트", "스모크 테스트", "운영 검증"],
+          "evidenceGuide": "출시 조건과 고객 인수 기준을 확인합니다."
+        },
+        {
+          "id": "collaboration",
+          "name": "품질 협업·보고",
+          "weight": 5,
+          "keywords": ["품질 보고", "협업", "커뮤니케이션"],
+          "relatedKeywords": ["품질 지표", "테스트 리포트", "개발팀 조율", "결함 회고"],
+          "evidenceGuide": "품질 정보를 공유하고 조율한 경험을 확인합니다."
+        }
+      ]
+    },
+    {
+      "id": "product-pm",
+      "name": "프로덕트 매니저·PO",
+      "scoringMode": "evidence",
+      "criteria": [
+        {
+          "id": "problem",
+          "name": "문제 정의·고객 이해",
+          "weight": 20,
+          "keywords": ["문제 정의", "고객 문제", "고객 요구사항", "제품 전략"],
+          "relatedKeywords": ["고객 인터뷰", "VOC", "시장 조사", "Jobs to be Done", "문제 가설"],
+          "evidenceGuide": "본인이 정의한 고객 문제와 선택 근거를 확인합니다."
+        },
+        {
+          "id": "priority",
+          "name": "우선순위·로드맵",
+          "weight": 20,
+          "keywords": ["우선순위", "로드맵", "백로그", "프로덕트 오너"],
+          "relatedKeywords": ["RICE", "ICE", "기회비용", "스코프 조정", "MVP"],
+          "evidenceGuide": "제약 속 우선순위 판단과 포기한 대안을 확인합니다."
+        },
+        {
+          "id": "metrics",
+          "name": "지표·비즈니스 성과",
+          "weight": 15,
+          "keywords": ["제품 지표", "비즈니스 임팩트", "성과 관리"],
+          "relatedKeywords": ["리텐션", "전환율", "활성 사용자", "매출", "북극성 지표"],
+          "evidenceGuide": "성과 목표, 측정 방법과 기여 범위를 확인합니다."
+        },
+        {
+          "id": "delivery",
+          "name": "제품 실행·출시",
+          "weight": 15,
+          "keywords": ["제품 출시", "제품 개발", "실행 계획", "스프린트"],
+          "relatedKeywords": ["MVP 출시", "릴리스 계획", "애자일", "스크럼", "출시 후 개선"],
+          "evidenceGuide": "발견부터 출시·개선까지 맡은 역할을 확인합니다."
+        },
+        {
+          "id": "stakeholders",
+          "name": "이해관계자 조율",
+          "weight": 15,
+          "keywords": ["이해관계자", "협업", "커뮤니케이션", "의사결정"],
+          "relatedKeywords": ["개발팀 조율", "디자인 협업", "사업 협의", "갈등 조정"],
+          "evidenceGuide": "상이한 요구를 조율한 판단과 합의를 확인합니다."
+        },
+        {
+          "id": "experiment",
+          "name": "가설·실험·검증",
+          "weight": 10,
+          "keywords": ["가설 검증", "실험 설계", "제품 검증"],
+          "relatedKeywords": ["A/B 테스트", "프로토타입", "사용성 테스트", "파일럿"],
+          "evidenceGuide": "실험의 성공 기준과 학습·후속 결정을 확인합니다."
+        },
+        {
+          "id": "documents",
+          "name": "제품 문서화",
+          "weight": 5,
+          "keywords": ["PRD", "제품 요구사항", "문서화"],
+          "relatedKeywords": ["유저 스토리", "인수 조건", "의사결정 기록", "제품 명세"],
+          "evidenceGuide": "실행과 의사결정에 쓰인 문서와 본인의 역할을 확인합니다."
+        }
+      ]
+    },
+    {
+      "id": "project-pm",
+      "name": "구축·IT 프로젝트 매니저",
+      "scoringMode": "evidence",
+      "criteria": [
+        {
+          "id": "lifecycle",
+          "name": "프로젝트 전체 과정 관리",
+          "weight": 20,
+          "keywords": ["프로젝트 관리", "프로젝트 전 과정", "전체 과정", "구축", "오픈", "안정화"],
+          "relatedKeywords": ["착수", "설계", "테스트", "이행", "전환", "고객 검수", "종료 보고"],
+          "evidenceGuide": "착수부터 고객 인수·안정화까지 책임진 범위를 확인합니다."
+        },
+        {
+          "id": "scope",
+          "name": "요구사항·범위·우선순위",
+          "weight": 20,
+          "keywords": ["요구사항", "범위", "우선순위", "기술적 제약", "제약조건"],
+          "relatedKeywords": ["요구사항 정의", "변경 요청", "스코프", "변경관리", "실행 계획"],
+          "evidenceGuide": "변경·제약을 반영한 범위와 우선순위 결정을 확인합니다."
+        },
+        {
+          "id": "resources",
+          "name": "일정·품질·리소스·이슈",
+          "weight": 15,
+          "keywords": ["일정", "품질", "리소스", "주요 이슈", "이슈 관리", "의사결정"],
+          "relatedKeywords": [
+            "WBS",
+            "마일스톤",
+            "간트차트",
+            "인력 배분",
+            "리스크 관리",
+            "일정 지연"
+          ],
+          "evidenceGuide": "일정·품질·인력 충돌의 판단, 조치와 결과를 확인합니다.",
+          "keywordRelations": {
+            "품질": ["품질 게이트", "테스트 계획", "품질 지표", "고객 검수", "결함 관리"],
+            "리소스": ["인력 배분", "공수", "리소스 계획", "인력 재배치"],
+            "주요 이슈": ["리스크 관리", "리스크 등록부", "장애 대응", "이슈 해결"],
+            "이슈 관리": ["리스크 관리", "리스크 등록부", "장애 대응", "이슈 해결"]
+          }
+        },
+        {
+          "id": "stakeholders",
+          "name": "고객·조직·파트너 조율",
+          "weight": 15,
+          "keywords": ["이해관계자", "고객 미팅", "협업", "커뮤니케이션", "조율"],
+          "relatedKeywords": [
+            "고객 협의",
+            "개발팀",
+            "수행 조직",
+            "외부 파트너",
+            "피드백",
+            "갈등 조정"
+          ],
+          "evidenceGuide": "고객과 수행 조직 사이에서 이끈 합의를 확인합니다."
+        },
+        {
+          "id": "regulated",
+          "name": "금융권·보안·컴플라이언스",
+          "weight": 15,
+          "keywords": ["금융권", "은행", "보험", "증권", "보안", "규제", "컴플라이언스"],
+          "relatedKeywords": [
+            "금융 프로젝트",
+            "보안 심사",
+            "접근 통제",
+            "개인정보 보호",
+            "감사 대응"
+          ],
+          "evidenceGuide": "고객 산업과 보안·규제 요구를 반영한 경험을 확인합니다.",
+          "keywordRelations": {
+            "금융권": ["금융 프로젝트", "은행 프로젝트", "보험 프로젝트", "증권 프로젝트"],
+            "은행": ["금융 프로젝트", "은행 프로젝트", "보험 프로젝트", "증권 프로젝트"],
+            "보험": ["금융 프로젝트", "은행 프로젝트", "보험 프로젝트", "증권 프로젝트"],
+            "증권": ["금융 프로젝트", "은행 프로젝트", "보험 프로젝트", "증권 프로젝트"]
+          }
+        },
+        {
+          "id": "presales",
+          "name": "프리세일즈·공수·PoC",
+          "weight": 10,
+          "keywords": ["프리세일즈", "공수", "원가 산정", "PoC", "Proof of Concept"],
+          "relatedKeywords": ["개념 검증", "파일럿", "기술 검증", "성공 기준", "견적", "제안 발표"],
+          "evidenceGuide": "제안·견적과 PoC의 성공 기준·운영 결과를 확인합니다."
+        },
+        {
+          "id": "documents",
+          "name": "프로젝트 문서·산출물",
+          "weight": 5,
+          "keywords": ["요구사항 정의서", "프로젝트 산출물", "제안서", "문서를 작성"],
+          "relatedKeywords": ["수행 계획서", "산출물 관리", "회의록", "검수 문서", "보고서"],
+          "evidenceGuide": "작성·관리한 산출물과 실제 활용을 확인합니다."
+        }
+      ]
+    },
+    {
+      "id": "service-planning",
+      "name": "서비스·UX 기획",
+      "scoringMode": "evidence",
+      "criteria": [
+        {
+          "id": "requirements",
+          "name": "문제·요구사항 정의",
+          "weight": 20,
+          "keywords": ["서비스 기획", "문제 정의", "요구사항", "고객 요구사항"],
+          "relatedKeywords": ["VOC", "요구사항 정의서", "문제 가설", "경쟁 서비스 분석"],
+          "evidenceGuide": "문제를 구체화하고 요구를 선택한 근거를 확인합니다."
+        },
+        {
+          "id": "policy",
+          "name": "서비스 정책·프로세스",
+          "weight": 20,
+          "keywords": ["서비스 정책", "업무 프로세스", "정책 설계", "예외 처리"],
+          "relatedKeywords": ["권한 정책", "결제 정책", "운영 정책", "상태 정의", "엣지 케이스"],
+          "evidenceGuide": "정책·상태·예외 상황을 정의한 판단을 확인합니다."
+        },
+        {
+          "id": "specification",
+          "name": "정보 구조·화면 명세",
+          "weight": 20,
+          "keywords": ["화면 설계", "정보 구조", "IA", "기능 명세"],
+          "relatedKeywords": [
+            "와이어프레임",
+            "스토리보드",
+            "화면 정의서",
+            "유저 플로우",
+            "프로토타입"
+          ],
+          "evidenceGuide": "화면 흐름과 기능 명세를 작성한 역할을 확인합니다."
+        },
+        {
+          "id": "research",
+          "name": "사용자 조사·검증",
+          "weight": 10,
+          "keywords": ["사용자 조사", "사용성 검증", "UX 리서치"],
+          "relatedKeywords": ["인터뷰", "설문", "사용성 테스트", "페르소나", "고객 여정"],
+          "evidenceGuide": "조사와 관찰을 기획에 반영한 과정을 확인합니다."
+        },
+        {
+          "id": "metrics",
+          "name": "지표·개선",
+          "weight": 10,
+          "keywords": ["서비스 지표", "성과 분석", "서비스 개선"],
+          "relatedKeywords": ["퍼널 분석", "전환율", "리텐션", "A/B 테스트", "이벤트 설계"],
+          "evidenceGuide": "측정한 문제와 개선 결과를 확인합니다."
+        },
+        {
+          "id": "collaboration",
+          "name": "기획 협업·조율",
+          "weight": 10,
+          "keywords": ["협업", "개발팀", "디자인팀", "커뮤니케이션"],
+          "relatedKeywords": ["요구사항 조율", "우선순위", "정책 합의", "의사결정 기록"],
+          "evidenceGuide": "개발·디자인·운영의 제약을 조율한 경험을 확인합니다."
+        },
+        {
+          "id": "launch",
+          "name": "검수·출시·운영",
+          "weight": 10,
+          "keywords": ["출시", "검수", "운영 개선", "안정화"],
+          "relatedKeywords": ["UAT", "인수 조건", "QA 시나리오", "릴리스", "운영 가이드"],
+          "evidenceGuide": "검수와 출시 이후 운영 개선을 확인합니다."
+        }
+      ]
+    },
+    {
+      "id": "product-design",
+      "name": "프로덕트·UX/UI 디자인",
+      "scoringMode": "evidence",
+      "criteria": [
+        {
+          "id": "research",
+          "name": "사용자 이해·리서치",
+          "weight": 20,
+          "keywords": ["UX 리서치", "사용자 조사", "문제 정의"],
+          "relatedKeywords": ["인터뷰", "설문", "사용성 테스트", "페르소나", "VOC"],
+          "evidenceGuide": "조사 방법과 디자인 문제를 도출한 근거를 확인합니다."
+        },
+        {
+          "id": "ux",
+          "name": "UX 구조·흐름",
+          "weight": 20,
+          "keywords": ["UX 설계", "정보 구조", "사용자 흐름", "인터랙션 설계"],
+          "relatedKeywords": ["IA", "유저 플로우", "고객 여정", "와이어프레임"],
+          "evidenceGuide": "사용자의 과업을 구조와 흐름으로 해결한 경험을 확인합니다."
+        },
+        {
+          "id": "ui",
+          "name": "UI·시각 디자인",
+          "weight": 20,
+          "keywords": ["UI 디자인", "시각 디자인", "반응형 디자인", "접근성"],
+          "relatedKeywords": ["타이포그래피", "레이아웃", "컬러 시스템", "WCAG", "모바일 UI"],
+          "evidenceGuide": "시각적 선택의 이유와 다양한 사용 조건을 확인합니다."
+        },
+        {
+          "id": "prototype",
+          "name": "프로토타입·검증",
+          "weight": 15,
+          "keywords": ["프로토타입", "프로토타이핑", "사용성 검증"],
+          "relatedKeywords": ["Figma", "Framer", "인터랙티브 프로토타입", "태스크 성공률"],
+          "evidenceGuide": "도구 언급과 실제 검증 활동·결과를 구분합니다."
+        },
+        {
+          "id": "system",
+          "name": "디자인 시스템",
+          "weight": 10,
+          "keywords": ["디자인 시스템", "컴포넌트", "디자인 가이드"],
+          "relatedKeywords": ["디자인 토큰", "컴포넌트 라이브러리", "변형 관리", "Storybook"],
+          "evidenceGuide": "일관성과 재사용성을 위한 설계·운영을 확인합니다."
+        },
+        {
+          "id": "impact",
+          "name": "디자인 성과·개선",
+          "weight": 10,
+          "keywords": ["디자인 개선", "성과 측정", "제품 지표"],
+          "relatedKeywords": ["전환율", "사용성 개선", "A/B 테스트", "이탈률"],
+          "evidenceGuide": "디자인 변경과 관측한 결과의 연결을 확인합니다."
+        },
+        {
+          "id": "handoff",
+          "name": "협업·핸드오프",
+          "weight": 5,
+          "keywords": ["핸드오프", "개발 협업", "디자인 QA"],
+          "relatedKeywords": ["디자인 명세", "개발팀 조율", "구현 검수", "피드백 반영"],
+          "evidenceGuide": "구현 과정의 전달·조율과 품질 확인을 평가합니다."
+        }
+      ]
+    },
+    {
+      "id": "presales",
+      "name": "기술영업·프리세일즈",
+      "scoringMode": "evidence",
+      "criteria": [
+        {
+          "id": "discovery",
+          "name": "고객 발굴·요구 분석",
+          "weight": 20,
+          "keywords": ["고객 요구사항", "니즈 분석", "기회 발굴", "기술영업"],
+          "relatedKeywords": ["고객 인터뷰", "디스커버리", "RFP 분석", "고객 환경 분석"],
+          "evidenceGuide": "고객 문제와 구매·기술 조건을 파악한 역할을 확인합니다."
+        },
+        {
+          "id": "solution",
+          "name": "솔루션·아키텍처 제안",
+          "weight": 20,
+          "keywords": ["솔루션 제안", "기술 제안", "아키텍처 설계"],
+          "relatedKeywords": ["구성도", "제품 매핑", "연동 설계", "대안 비교"],
+          "evidenceGuide": "고객 환경에 맞춘 제안과 선택 근거를 확인합니다."
+        },
+        {
+          "id": "poc",
+          "name": "데모·PoC 검증",
+          "weight": 15,
+          "keywords": ["데모", "PoC", "기술 검증", "개념 검증"],
+          "relatedKeywords": ["파일럿", "성공 기준", "벤치마크", "검증 시나리오"],
+          "evidenceGuide": "시연·검증 범위와 고객 평가 결과를 확인합니다."
+        },
+        {
+          "id": "proposal",
+          "name": "제안·견적·가치 산정",
+          "weight": 15,
+          "keywords": ["제안서", "견적", "공수", "원가 산정"],
+          "relatedKeywords": ["ROI", "TCO", "비용 산정", "라이선스 구성", "제안 발표"],
+          "evidenceGuide": "기술 범위와 비용·가치를 연결한 근거를 확인합니다."
+        },
+        {
+          "id": "sales",
+          "name": "영업 기회·협상",
+          "weight": 15,
+          "keywords": ["영업 파이프라인", "수주", "계약", "협상"],
+          "relatedKeywords": ["CRM", "Salesforce", "HubSpot", "기회 관리", "전환율"],
+          "evidenceGuide": "영업 활동에서 맡은 단계와 기여한 결과를 확인합니다."
+        },
+        {
+          "id": "security",
+          "name": "보안·도입 검토",
+          "weight": 10,
+          "keywords": ["보안", "컴플라이언스", "도입 검토"],
+          "relatedKeywords": ["보안 질의서", "접근 제어", "개인정보 보호", "보안 심사"],
+          "evidenceGuide": "고객의 보안·도입 조건을 충족하도록 조율한 경험을 확인합니다."
+        },
+        {
+          "id": "handoff",
+          "name": "수행 인계·파트너 협업",
+          "weight": 5,
+          "keywords": ["인계", "파트너 협업", "수행 조직"],
+          "relatedKeywords": ["기술 교육", "구축팀 인계", "공동 제안", "운영 가이드"],
+          "evidenceGuide": "수주 이후 실행 조직에 전달한 범위와 내용을 확인합니다."
+        }
+      ]
+    },
+    {
+      "id": "customer-success",
+      "name": "고객성공·서비스 운영",
+      "scoringMode": "evidence",
+      "criteria": [
+        {
+          "id": "onboarding",
+          "name": "고객 온보딩·교육",
+          "weight": 20,
+          "keywords": ["온보딩", "고객 교육", "도입 지원"],
+          "relatedKeywords": ["초기 설정", "사용 가이드", "교육 세션", "활성화"],
+          "evidenceGuide": "고객이 사용을 시작하도록 지원한 역할과 결과를 확인합니다."
+        },
+        {
+          "id": "adoption",
+          "name": "사용 확산·고객 가치",
+          "weight": 20,
+          "keywords": ["고객성공", "사용 확산", "고객 가치", "활용도"],
+          "relatedKeywords": ["헬스 스코어", "QBR", "사용량 분석", "성공 계획"],
+          "evidenceGuide": "고객 목표와 제품 활용·가치 실현을 연결한 경험을 확인합니다."
+        },
+        {
+          "id": "incidents",
+          "name": "문의·장애·서비스 품질",
+          "weight": 15,
+          "keywords": ["고객지원", "CS", "문의 대응", "서비스 품질"],
+          "relatedKeywords": ["티켓 관리", "SLA", "에스컬레이션", "장애 공지", "응답 시간"],
+          "evidenceGuide": "문의·장애의 처리 과정과 품질 개선을 확인합니다."
+        },
+        {
+          "id": "retention",
+          "name": "유지·갱신·확장",
+          "weight": 15,
+          "keywords": ["고객 유지", "갱신", "이탈 방지", "업셀"],
+          "relatedKeywords": ["리텐션", "NRR", "GRR", "계약 갱신", "이탈률"],
+          "evidenceGuide": "유지·갱신·확장에 기여한 조치와 결과를 확인합니다."
+        },
+        {
+          "id": "feedback",
+          "name": "VOC·고객 경험 개선",
+          "weight": 10,
+          "keywords": ["VOC", "고객 피드백", "고객 경험", "CX"],
+          "relatedKeywords": ["NPS", "CSAT", "설문", "불만 분석", "제품 개선 제안"],
+          "evidenceGuide": "수집한 피드백을 개선으로 연결한 경험을 확인합니다."
+        },
+        {
+          "id": "operations",
+          "name": "운영 프로세스·자동화",
+          "weight": 10,
+          "keywords": ["운영 프로세스", "운영 자동화", "서비스 운영"],
+          "relatedKeywords": ["SOP", "FAQ", "지식베이스", "매뉴얼", "반복 업무 자동화"],
+          "evidenceGuide": "운영 표준화와 반복 업무 개선을 확인합니다."
+        },
+        {
+          "id": "stakeholders",
+          "name": "고객·내부 협업",
+          "weight": 10,
+          "keywords": ["고객 커뮤니케이션", "이해관계자", "협업"],
+          "relatedKeywords": ["고객 미팅", "개발팀 조율", "영업 인계", "파트너 관리"],
+          "evidenceGuide": "고객과 내부 조직을 연결한 합의·실행을 확인합니다."
+        }
+      ]
+    }
+  ]
+}

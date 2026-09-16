@@ -7,6 +7,7 @@ export interface User {
 export type Category = '기술 역량' | '경험' | '협업' | '우대사항';
 export const categories: Category[] = ['기술 역량', '경험', '협업', '우대사항'];
 export interface Job {
+  profileCatalogVersion?: string;
   id: string;
   companyName: string;
   title: string;
@@ -18,6 +19,7 @@ export interface Job {
   minExperience: number;
 }
 export interface EvaluationCriterion {
+  catalogCriterionId?: string;
   id: string;
   jobId: string;
   category: Category;
@@ -72,6 +74,8 @@ export interface ResumeVersion {
 }
 export type EvaluationLevel = 'Strong' | 'Good' | 'Partial' | 'Unverified';
 export interface EvaluationItem {
+  evidenceLevel?: number;
+  keywordMatches?: import('@/lib/evaluation/keyword-contract').KeywordMatch[];
   id: string;
   evaluationId: string;
   criterionId: string;

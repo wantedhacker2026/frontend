@@ -28,7 +28,13 @@ const noop = () => {};
 test('role determines processing task and destination with staged progress', async () => {
   for (const actor of [applicant, recruiter]) {
     const stages: number[] = [];
-    const p = await processDraft(demoDraft(actor), actor, undefined, (s) => stages.push(s));
+    const p = await processDraft(
+      demoDraft(actor),
+      actor,
+      undefined,
+      (s) => stages.push(s),
+      new MockCandidateEvaluator(),
+    );
     assert.equal(p.revisions[0].taskType, actor.role === 'applicant' ? 'analysis' : 'summary');
     assert.equal(p.revisions[0].analyses.length, actor.role === 'applicant' ? 1 : 20);
     assert.match(projectRoute(p), actor.role === 'applicant' ? /my-analysis$/ : /applicants$/);

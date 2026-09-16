@@ -1,5 +1,7 @@
 # wantedhacker
 
+로컬 Docker 실행: `docker compose up --build -d --wait web` → http://localhost:3000/home. 프론트엔드·Kotlin 서버와 기존 상태 검사에 필요한 Elasticsearch를 함께 실행합니다. 서버 저장소를 형제 폴더 `../03_wantedhacker-server`에 두세요. 개발 모드와 컨테이너 테스트는 [Docker 실행 가이드](docs/docker.md)를 참고하세요.
+
 기본 진입은 `/home`의 역할별 프로젝트 흐름입니다. [와이어프레임 V4 적용 내역](docs/wireframe-v4.md)에서 화면별 변경, 데모 범위, 파일 제한과 서버 연동 지점을 확인하세요. 기존 채용공고·지원서 버전·평가 흐름도 유지됩니다.
 
 **지원서를 읽는 시간은 줄이고, 더 좋은 채용 결정에 집중하세요.**
@@ -240,3 +242,7 @@ npm run format:check
 - 모바일에서는 분석표를 카드 형태로 표시합니다. 내부 배점은 채용담당자 화면에서만 표시합니다.
 - `components/evaluation/jd-brief.tsx`, `document-analysis.tsx`, `app/workspace.css`로 화면 구성과 스타일을 분리했습니다.
 - 적용 범위는 선택된 서류 분석 화면, 연결된 상세 모달, 공통 프로젝트 탐색입니다. 시안의 JD URL 수집·이미지/PDF 업로드·AI 인터뷰는 연동하지 않았으며 기존 지원서 버전 선택·텍스트 수정·데모 분석을 사용합니다.
+
+## 면접 준비
+
+구직자는 JD 입력 중 기본 질문과 분석 직후 개인별 예상 질문을 볼 수 있습니다. 채용담당자는 지원자 상세의 **면접 준비**에서 질문지를 생성·수정하고 메모와 확인 상태를 저장합니다. 사용법, 선택적 AI 연결, 로컬 저장 범위는 [면접 준비 문서](docs/interview-preparation.md)를 참고하세요.

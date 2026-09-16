@@ -1,4 +1,6 @@
 'use client';
+import { getJobProfile } from '@/lib/evaluation/job-profiles';
+import { fitSummary, sortAnalyses } from '@/lib/projects/fit';
 import { useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight, FilePlus2, FileText, Search, Copy, History } from 'lucide-react';
@@ -7,6 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/states';
 import { MatchScore } from '@/components/evaluation/score';
+import { InterviewPanel } from './interview';
+import { packetKey, stageNames } from '@/lib/interview/domain';
 import type {
   AnalysisProject,
   ProjectAnalysis,
@@ -50,14 +54,11 @@ function ProjectResultContent({ project }: { project: AnalysisProject }) {
   const revision = project.revisions.find((r) => r.id === revisionId) ?? project.revisions.at(-1)!;
   const [selected, setSelected] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [order, setOrder] = useState('balanced');
+  const [tab, setTab] = useState<'analysis' | 'interview'>('analysis');
   const recruiter = project.role === 'recruiter';
   const chosen = revision.analyses.find((a) => a.id === selected);
-  const sorted = [...revision.analyses].sort(
-    (a, b) =>
-      (b.registeredAt ?? revision.createdAt).localeCompare(a.registeredAt ?? revision.createdAt) ||
-      a.name.localeCompare(b.name, 'ko') ||
-      a.personId.localeCompare(b.personId),
-  );
+  const sorted = sortAnalyses(revision.analyses, project.criteria, order);
   return (
     <div className="project-result">
       <Link href="/home" className="back-link">
@@ -98,6 +99,9 @@ function ProjectResultContent({ project }: { project: AnalysisProject }) {
         <div>
           <FileText size={22} />
           <h2>JD 분석 핵심 키워드</h2>
+          {project.jobProfile && (
+            <small>분석 직무: {getJobProfile(project.jobProfile)?.name}</small>
+          )}
           <small>
             JD v1 ·{' '}
             {project.jd.mode === 'text'
@@ -155,6 +159,27 @@ function ProjectResultContent({ project }: { project: AnalysisProject }) {
               onChange={(e) => setSearch(e.target.value)}
             />
           </label>
+          <label className="project-sort">
+            지원자 정렬
+            <select
+              aria-label="지원자 정렬"
+              value={order}
+              onChange={(e) => setOrder(e.target.value)}
+            >
+              <option value="balanced">균형순</option>
+              <option value="score">종합점수순</option>
+              <option value="recent">최근 등록순</option>
+              {project.criteria.map((c) => (
+                <option key={c.id} value={`criterion:${c.id}`}>
+                  {c.name} 중심
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="project-notice">
+            균형순: 핵심 충족 수 → 전체 항목 충족률 → 총점. 충족률은 배점 크기와 관계없이 항목 수로
+            계산합니다. 미기재·판독 불가는 추가 확인 대상이며 자동 탈락 기준이 아닙니다.
+          </p>
           <div className="project-applicant-list">
             {sorted
               .filter((a) => a.name.includes(search))
@@ -162,7 +187,10 @@ function ProjectResultContent({ project }: { project: AnalysisProject }) {
                 <button
                   key={a.id}
                   className="project-applicant-row"
-                  onClick={() => setSelected(a.id)}
+                  onClick={() => {
+                    setSelected(a.id);
+                    setTab('analysis');
+                  }}
                   aria-haspopup="dialog"
                 >
                   <span className="project-person-avatar" aria-hidden="true">
@@ -173,8 +201,20 @@ function ProjectResultContent({ project }: { project: AnalysisProject }) {
                     <small>생년월일 {a.birthDate || '미기재'}</small>
                   </span>
                   <span className="project-row-summary">{a.summary}</span>
+                  <span className="project-fit-row">
+                    <FitMetrics project={project} analysis={a} />
+                  </span>
                   <span className="project-row-status">
-                    {a.results.every((r) => r.status === 'unreadable') ? '판독 불가' : '요약 완료'}
+                    {(() => {
+                      const packet = project.interviews?.find(
+                        (p) => p.key === packetKey(revision.id, a.id),
+                      );
+                      return packet
+                        ? stageNames[packet.stage]
+                        : a.results.every((r) => r.status === 'unreadable')
+                          ? '판독 불가'
+                          : '요약 완료';
+                    })()}
                   </span>
                   <ArrowRight size={16} />
                 </button>
@@ -196,17 +236,43 @@ function ProjectResultContent({ project }: { project: AnalysisProject }) {
           >
             {chosen && (
               <>
-                <ProjectAnalysisTable project={project} revision={revision} analysis={chosen} />
-                <section className="project-one-line">
-                  <h3>지원자 서류 한 줄 요약</h3>
-                  <p>{chosen.summary}</p>
-                </section>
+                <div className="project-table-filters" aria-label="지원자 상세 메뉴">
+                  <button aria-pressed={tab === 'analysis'} onClick={() => setTab('analysis')}>
+                    서류 분석
+                  </button>
+                  <button aria-pressed={tab === 'interview'} onClick={() => setTab('interview')}>
+                    면접 준비
+                  </button>
+                </div>
+                {tab === 'interview' ? (
+                  <InterviewPanel
+                    key={`${revision.id}:${chosen.id}`}
+                    project={project}
+                    revision={revision}
+                    analysis={chosen}
+                  />
+                ) : (
+                  <>
+                    <ProjectAnalysisTable project={project} revision={revision} analysis={chosen} />
+                    <section className="project-one-line">
+                      <h3>지원자 서류 한 줄 요약</h3>
+                      <p>{chosen.summary}</p>
+                    </section>
+                    <Button onClick={() => setTab('interview')}>면접 준비 열기</Button>
+                  </>
+                )}
               </>
             )}
           </Dialog>
         </>
       ) : revision.analyses[0] ? (
         <>
+          <InterviewPanel
+            key={`${revision.id}:${revision.analyses[0].id}`}
+            project={project}
+            revision={revision}
+            analysis={revision.analyses[0]}
+          />
           <div className="project-analysis-score">
             <MatchScore score={revision.analyses[0].score} compact />
             <p>{revision.analyses[0].summary}</p>
@@ -225,10 +291,33 @@ function ProjectResultContent({ project }: { project: AnalysisProject }) {
         />
       )}
       <p className="project-footnote">
-        규칙 기반 데모입니다. 기재 O / X는 서류에 해당 내용이 있는지를 뜻하며, 능력이나 합격 여부를
-        의미하지 않습니다. AI 판독 정책은 미확정이므로 현재의 ‘규칙 판독’은 참고용입니다.
+        {recruiter
+          ? '연관 O는 직접 키워드 또는 등록된 연관 기술의 언급이 있다는 뜻입니다. 실제 숙련도나 합격 여부를 뜻하지 않습니다. 기존 분석은 당시 규칙을 유지하며, 다시 분석하면 현재 서버 규칙이 적용됩니다.'
+          : '규칙 기반 데모입니다. 기재 O / X는 서류에 해당 내용이 있는지를 뜻하며, 능력이나 합격 여부를 의미하지 않습니다.'}
       </p>
     </div>
+  );
+}
+function FitMetrics({
+  project,
+  analysis,
+}: {
+  project: AnalysisProject;
+  analysis: ProjectAnalysis;
+}) {
+  const fit = fitSummary(project.criteria, analysis);
+  if (!fit.available) return <span>충족률 산출 불가 · 항목 점수 또는 판독 결과 확인 필요</span>;
+  return (
+    <>
+      <span>종합 {analysis.score}점</span>
+      <span>핵심 {fit.coreTotal ? `${fit.coreMet}/${fit.coreTotal}` : '미지정'}</span>
+      <span>
+        항목 충족 {fit.met}/{fit.total} · {fit.coverage}%
+      </span>
+      <span>추가 확인: {fit.weak.join(', ') || '없음'}</span>
+      {fit.unknown.length > 0 && <span>판정 불가: {fit.unknown.join(', ')}</span>}
+      {fit.legacy && <span>이전 키워드 방식 · 저장 당시 점수 기준</span>}
+    </>
   );
 }
 function ProjectAnalysisTable({
@@ -244,6 +333,10 @@ function ProjectAnalysisTable({
   const [filter, setFilter] = useState('all');
   const [copyState, setCopyState] = useState('');
   const recruiter = project.role === 'recruiter';
+  const keywordAnalysis = analysis.results.some((r) => r.keywordMatches);
+  const scored = analysis.results.some((r) => r.score !== undefined);
+  const evidenceLabels = ['미확인', '언급', '역할', '판단', '결과'];
+  const fit = fitSummary(project.criteria, analysis);
   const criterion = project.criteria.find((c) => c.id === selected?.criterionId);
   const suggestion = criterion
     ? selected?.sources.length
@@ -252,6 +345,17 @@ function ProjectAnalysisTable({
     : '';
   return (
     <div className="project-analysis">
+      {scored && (
+        <p className="project-notice">
+          직무 기준 점수 {analysis.score}/100 · JD에 해당하는 항목의 배점을 100점으로 환산했습니다.
+          근거 수준은 서류 표현에 대한 규칙 판독이며, 실제 역량이나 성과의 검증 결과가 아닙니다.
+        </p>
+      )}
+      {recruiter && (
+        <div className="project-fit-summary">
+          <FitMetrics project={project} analysis={analysis} />
+        </div>
+      )}
       <div className="project-table-filters" aria-label="분석표 필터">
         {[
           { id: 'all', label: '전체' },
@@ -269,10 +373,9 @@ function ProjectAnalysisTable({
           <thead>
             <tr>
               <th scope="col">JD 기준</th>
-              <th scope="col">지원서</th>
-              <th scope="col">
-                규칙 판독 <small>데모</small>
-              </th>
+              <th scope="col">{keywordAnalysis ? '인정 근거' : '지원서'}</th>
+              <th scope="col">{keywordAnalysis ? '키워드 연관' : '규칙 판독'}</th>
+              {scored && <th scope="col">점수·근거 수준</th>}
               <th scope="col">근거 요약</th>
               <th scope="col">상태</th>
             </tr>
@@ -295,17 +398,77 @@ function ProjectAnalysisTable({
                       }}
                     >
                       {project.criteria.find((c) => c.id === r.criterionId)?.name}
+                      {project.criteria.find((c) => c.id === r.criterionId)?.core && ' · 핵심'}
                       <ArrowRight size={13} />
                     </button>
+                    {recruiter && (
+                      <small>
+                        충족 기준{' '}
+                        {(project.criteria.find((c) => c.id === r.criterionId)?.minimumRatio ??
+                          0.5) * 100}
+                        % ·{' '}
+                        {fit.items.find((i) => i.criterion.id === r.criterionId)?.ratio === null
+                          ? '판정 불가'
+                          : fit.items.find((i) => i.criterion.id === r.criterionId)?.met
+                            ? '충족'
+                            : '추가 확인'}
+                      </small>
+                    )}
                   </th>
-                  <td data-label="지원서">
+                  <td data-label={keywordAnalysis ? '인정 근거' : '지원서'}>
                     {r.status === 'unreadable'
                       ? '판독 불가'
                       : r.mentioned
-                        ? 'O · 기재'
-                        : 'X · 미기재'}
+                        ? keywordAnalysis
+                          ? 'O · 있음'
+                          : 'O · 기재'
+                        : keywordAnalysis
+                          ? 'X · 미확인'
+                          : 'X · 미기재'}
                   </td>
-                  <td data-label="규칙 판독">{r.reading}</td>
+                  <td data-label={keywordAnalysis ? '키워드 연관' : '규칙 판독'}>
+                    {r.keywordMatches ? (
+                      <div className="project-keyword-matches">
+                        <strong>
+                          {r.status === 'unreadable'
+                            ? '판독 불가'
+                            : r.reading === 'O'
+                              ? 'O · 연관 있음'
+                              : 'X · 미확인'}
+                        </strong>
+                        {r.keywordMatches.map((match, index) => (
+                          <div key={`${match.jdKeyword}-${index}`}>
+                            {match.jdKeyword}:{' '}
+                            {match.relation === 'NONE'
+                              ? r.status === 'unreadable'
+                                ? '판독 불가'
+                                : '미확인'
+                              : `${match.matchedKeyword} · ${match.relation === 'DIRECT' ? '직접 일치' : '연관 일치'}`}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      r.reading
+                    )}
+                  </td>
+                  {scored && (
+                    <td data-label="점수·근거 수준">
+                      {r.status === 'unreadable' ? (
+                        '판독 불가'
+                      ) : (
+                        <div>
+                          <strong>
+                            {r.score} / {r.maxScore}
+                          </strong>
+                          {r.evidenceLevel !== undefined && (
+                            <p>
+                              {evidenceLabels[r.evidenceLevel]} · {r.evidenceLevel}/4
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                  )}
                   <td data-label="근거 요약">
                     <p>{r.sources[0]?.excerpt ?? r.reason}</p>
                   </td>
@@ -356,7 +519,14 @@ function ProjectAnalysisTable({
                         {doc?.source === 'pdf' ? `${source.page}페이지` : '텍스트 원문'}
                       </small>
                     </div>
-                    <blockquote>{highlight(source.excerpt, criterion.keywords)}</blockquote>
+                    <blockquote>
+                      {highlight(source.excerpt, [
+                        ...criterion.keywords,
+                        ...(selected.keywordMatches?.flatMap((m) =>
+                          m.matchedKeyword ? [m.matchedKeyword] : [],
+                        ) ?? []),
+                      ])}
+                    </blockquote>
                     <details>
                       <summary>
                         {doc?.source === 'pdf'
@@ -379,6 +549,7 @@ function ProjectAnalysisTable({
             <section>
               <h3>해당 JD 항목에 관한 설명</h3>
               <p>{selected.reason}</p>
+              {keywordAnalysis && <small>적용 규칙: {analysis.evaluatorVersion}</small>}
             </section>
             {!recruiter && (
               <>

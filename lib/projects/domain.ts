@@ -1,6 +1,15 @@
 import { containsKeyword, generateCriteria } from '@/data/mock/criteria';
+import {
+  deriveJobCriteria,
+  allocateProfileWeights,
+  getJobProfile,
+  JOB_PROFILE_CATALOG_VERSION,
+  type JobProfileId,
+} from '@/lib/evaluation/job-profiles';
 import type { CandidateEvaluator } from '@/lib/evaluation/interface';
 import { MockCandidateEvaluator } from '@/lib/evaluation/mock-evaluator';
+import { ServerKeywordEvaluator } from '@/lib/evaluation/server-keyword-evaluator';
+import { MAX_ANALYSIS_CRITERIA } from '@/lib/evaluation/limits';
 import type { Application, EvaluationCriterion, Job } from '@/types';
 import { evidenceLines } from './evidence';
 import {
@@ -25,14 +34,15 @@ export function ownedProjects(projects: AnalysisProject[], actor: ProjectActor |
 export function parseProjects(raw: string): ProjectDB {
   return projectDBSchema.parse(JSON.parse(raw));
 }
-export function deriveCriteria(text: string): ProjectCriterion[] {
+export function deriveCriteria(text: string, jobProfile?: JobProfileId): ProjectCriterion[] {
+  if (jobProfile) return deriveJobCriteria(text, jobProfile);
   const base = generateCriteria('project', text)
     .filter((c) => c.keywords.some((k) => containsKeyword(text, k)))
     .map((c) => ({
       id: crypto.randomUUID(),
       name: c.name,
       description: c.description,
-      keywords: c.keywords,
+      keywords: c.keywords.filter((k) => containsKeyword(text, k)),
       required: c.required,
     }));
   const additions = [
@@ -52,6 +62,8 @@ export function deriveCriteria(text: string): ProjectCriterion[] {
   return base;
 }
 export function validateDraft(draft: ProjectDraft, actor: ProjectActor) {
+  if (draft.jobProfile && !getJobProfile(draft.jobProfile))
+    throw new Error('분석 직무를 확인해 주세요.');
   if (!draft.title.trim()) throw new Error('프로젝트 이름을 입력해 주세요.');
   if (draft.jd.text.trim().length < 20)
     throw new Error('분석할 JD 본문을 20자 이상 입력해 주세요.');
@@ -70,7 +82,8 @@ export function validateDraft(draft: ProjectDraft, actor: ProjectActor) {
     draft.criteria.some((c) => !c.name.trim() || !c.keywords.some((k) => k.trim()))
   )
     throw new Error('JD 평가 기준과 확인할 키워드를 입력해 주세요.');
-  if (draft.criteria.length > 20) throw new Error('평가 기준은 최대 20개까지 등록할 수 있습니다.');
+  if (draft.criteria.length > MAX_ANALYSIS_CRITERIA)
+    throw new Error(`평가 기준은 최대 ${MAX_ANALYSIS_CRITERIA}개까지 등록할 수 있습니다.`);
   if (!draft.documents.some((d) => d.status === 'ready' && d.pages.some((p) => p.text.trim())))
     throw new Error('텍스트를 읽을 수 있는 서류를 한 개 이상 등록해 주세요.');
   if (draft.documents.length > 20) throw new Error('한 번에 최대 20개 파일을 등록할 수 있습니다.');
@@ -86,13 +99,23 @@ export async function processDraft(
   actor: ProjectActor,
   previous: AnalysisProject | undefined,
   onStage: (stage: number) => void,
-  evaluate: CandidateEvaluator = new MockCandidateEvaluator(),
+  evaluate: CandidateEvaluator = actor.role === 'recruiter' || draft.jobProfile
+    ? new ServerKeywordEvaluator()
+    : new MockCandidateEvaluator(),
 ): Promise<AnalysisProject> {
   validateDraft(draft, actor);
   if (previous && (previous.ownerId !== actor.id || previous.role !== actor.role))
     throw new Error('접근할 수 없는 프로젝트입니다.');
   if (previous && JSON.stringify(previous.jd) !== JSON.stringify(draft.jd))
     throw new Error('재분석은 기존 JD를 사용합니다. 다른 공고는 새 프로젝트로 만들어 주세요.');
+  if (
+    previous &&
+    (previous.jobProfile !== draft.jobProfile ||
+      previous.profileCatalogVersion !== draft.profileCatalogVersion)
+  )
+    throw new Error(
+      '재분석은 기존 직무와 평가 목록 버전을 사용합니다. 다른 직무는 새 프로젝트로 만들어 주세요.',
+    );
   if (
     previous &&
     (previous.id !== draft.id ||
@@ -103,17 +126,25 @@ export async function processDraft(
     );
   onStage(0);
   await new Promise((resolve) => setTimeout(resolve, 150));
+  const weights = draft.jobProfile
+    ? allocateProfileWeights(draft.criteria.map((c) => c.weight ?? 10))
+    : draft.criteria.map(
+        (_, i) =>
+          Math.floor(100 / draft.criteria.length) + (i < 100 % draft.criteria.length ? 1 : 0),
+      );
   const criteria: EvaluationCriterion[] = draft.criteria.map((c, i) => ({
     ...c,
     jobId: draft.id,
     category: '기술 역량',
-    weight: Math.floor(100 / draft.criteria.length) + (i < 100 % draft.criteria.length ? 1 : 0),
+    weight: weights[i],
   }));
   const job: Job = {
     id: draft.id,
     title: draft.title,
     companyName: '',
-    role: '',
+    role: draft.jobProfile ?? '',
+    profileCatalogVersion:
+      draft.profileCatalogVersion ?? (draft.jobProfile ? JOB_PROFILE_CATALOG_VERSION : undefined),
     description: draft.jd.text,
     createdAt: new Date().toISOString(),
     location: '',
@@ -152,7 +183,11 @@ export async function processDraft(
         .flatMap((d) =>
           d.pages.flatMap((page) =>
             evidenceLines(page.text)
-              .filter((line) => c.keywords.some((k) => containsKeyword(line, k)))
+              .filter((line) =>
+                item.keywordMatches
+                  ? item.keywordMatches.some((m) => m.relation !== 'NONE' && m.evidence === line)
+                  : c.keywords.some((k) => containsKeyword(line, k)),
+              )
               .map((excerpt) => ({
                 documentId: d.id,
                 filename: d.filename,
@@ -163,7 +198,11 @@ export async function processDraft(
         )
         .sort((a, b) => evidenceRank(b.excerpt) - evidenceRank(a.excerpt))
         .slice(0, 5);
-      const confirmed = ['Strong', 'Good'].includes(item.level);
+      const confirmed = draft.jobProfile
+        ? (item.evidenceLevel !== undefined
+            ? item.evidenceLevel / 4
+            : item.score / item.maxScore) >= (c.minimumRatio ?? 0.5)
+        : ['Strong', 'Good'].includes(item.level);
       const incomplete = documents.some(
         (d) => d.status === 'failed' || Boolean(d.unreadablePages?.length),
       );
@@ -177,15 +216,27 @@ export async function processDraft(
               : 'review';
       return {
         criterionId: c.id,
+        ...(item.keywordMatches ? { keywordMatches: item.keywordMatches } : {}),
+        score: item.score,
+        maxScore: item.maxScore,
+        ...(item.evidenceLevel !== undefined ? { evidenceLevel: item.evidenceLevel } : {}),
         mentioned: sources.length > 0,
-        reading: status === 'confirmed' ? 'O' : '-',
+        reading: item.keywordMatches
+          ? item.keywordMatches.some((m) => m.relation !== 'NONE')
+            ? 'O'
+            : '-'
+          : status === 'confirmed'
+            ? 'O'
+            : '-',
         status,
         sources,
         reason:
           status === 'unreadable'
             ? '읽지 못한 서류가 있어 이 항목을 확인할 수 없습니다. 파일을 교체해 주세요.'
             : status === 'missing'
-              ? '읽은 서류에서 해당 내용의 기재를 찾지 못했습니다. 능력이 없다는 뜻은 아닙니다.'
+              ? item.keywordMatches
+                ? item.reason
+                : '읽은 서류에서 해당 내용의 기재를 찾지 못했습니다. 능력이 없다는 뜻은 아닙니다.'
               : item.reason,
       };
     });
@@ -197,6 +248,7 @@ export async function processDraft(
       .map((r) => draft.criteria.find((c) => c.id === r.criterionId)!.name);
     analyses.push({
       id: application.id,
+      evaluatorVersion: evaluation.evaluatorVersion,
       personId: person.id,
       registeredAt:
         documents
@@ -207,7 +259,7 @@ export async function processDraft(
       birthDate: person.birthDate,
       score: evaluation.totalScore,
       results,
-      summary: `${confirmed.length ? `${confirmed.slice(0, 2).join(', ')}의 수행 근거가 확인됩니다.` : '직접 수행한 경험의 근거를 보완해 주세요.'} ${unclear.length ? `${unclear.slice(0, 2).join(', ')}는 추가 확인이 필요합니다.` : '등록된 기준마다 관련 근거가 있습니다.'}`,
+      summary: `${confirmed.length ? `${confirmed.slice(0, 2).join(', ')}의 ${actor.role === 'recruiter' ? '관련 키워드' : '수행 근거'}가 확인됩니다.` : '관련 경험의 근거를 추가로 확인해 주세요.'} ${unclear.length ? `${unclear.slice(0, 2).join(', ')}는 추가 확인이 필요합니다.` : '등록된 기준마다 관련 근거가 있습니다.'}`,
     });
   }
   onStage(2);
@@ -229,6 +281,9 @@ export async function processDraft(
     title: draft.title.trim(),
     ownerId: actor.id,
     role: actor.role,
+    ...(draft.jobProfile
+      ? { jobProfile: draft.jobProfile, profileCatalogVersion: job.profileCatalogVersion }
+      : {}),
     createdAt: previous?.createdAt ?? new Date().toISOString(),
     jd: structuredClone(draft.jd),
     criteria: structuredClone(draft.criteria),
@@ -247,7 +302,8 @@ export function saveProject(
     throw new Error('접근할 수 없는 프로젝트입니다.');
   if ((current?.revisions.length ?? 0) !== expectedRevisionCount)
     throw new Error('다른 분석이 먼저 저장됐습니다. 최신 결과를 열고 다시 시도해 주세요.');
-  return { ...db, projects: [...db.projects.filter((p) => p.id !== project.id), project] };
+  const saved = { ...project, ...(current?.interviews ? { interviews: current.interviews } : {}) };
+  return { ...db, projects: [...db.projects.filter((p) => p.id !== project.id), saved] };
 }
 export function revisionDraft(project: AnalysisProject): ProjectDraft {
   const revision = project.revisions.at(-1)!;
@@ -256,6 +312,9 @@ export function revisionDraft(project: AnalysisProject): ProjectDraft {
     title: project.title,
     jd: project.jd,
     criteria: project.criteria,
+    ...(project.jobProfile
+      ? { jobProfile: project.jobProfile, profileCatalogVersion: project.profileCatalogVersion }
+      : {}),
     documents: revision.documents,
     people: revision.people,
   });
