@@ -6,6 +6,16 @@ const rewritesSchema = z.object({
     .array(
       z.object({
         id: z.string(),
+        experienceId: z.string(),
+        evidenceIds: z.array(z.string()).min(1).max(2),
+        title: z
+          .string()
+          .trim()
+          .min(2)
+          .max(30)
+          .refine((v) => !/[\r\n?!。]/u.test(v)),
+        reason: z.string().trim().min(1).max(300),
+        grounding: z.enum(['verified', 'fallback']),
         question: z.string().trim().min(1).max(1000),
         followups: z.array(z.string().trim().min(1).max(500)).min(1).max(3),
         guide: z.array(z.string().trim().min(1).max(500)).min(1).max(4),
@@ -42,12 +52,15 @@ export async function generateInterview(
           ...(options.accessToken ? { Authorization: `Bearer ${options.accessToken}` } : {}),
         },
         cache: 'no-store',
-        signal: AbortSignal.timeout(28_000),
+        // Backend generation + independent review share a 50 second budget.
+        signal: AbortSignal.timeout(55_000),
         body: JSON.stringify({
           role: input.role,
           prompt: input.prompt ?? '',
           questions: editable.map((q) => ({
             id: q.id,
+            experienceId: q.topicId,
+            evidenceIds: q.evidenceIds,
             topic: q.topic,
             question: q.question,
             jdEvidence: q.jdEvidence,
@@ -69,15 +82,37 @@ export async function generateInterview(
       parsed.questions.some((q) => !editable.some((e) => e.id === q.id))
     )
       throw new Error('ids');
+    const questions = fallback.questions.map((q) => {
+      const rewrite = parsed.questions.find((r) => r.id === q.id);
+      // Resolve citations only within this experience. Never use provider source text.
+      if (
+        !rewrite ||
+        rewrite.grounding !== 'verified' ||
+        rewrite.experienceId !== q.topicId ||
+        new Set(rewrite.evidenceIds).size !== rewrite.evidenceIds.length ||
+        rewrite.evidenceIds.some((id) => !q.evidenceIds?.includes(id))
+      )
+        return q;
+      return {
+        ...q,
+        topic: rewrite.title,
+        reason: rewrite.reason,
+        question: rewrite.question,
+        followups: rewrite.followups,
+        guide: rewrite.guide,
+        grounding: rewrite.grounding,
+        evidenceIds: rewrite.evidenceIds,
+        sources: rewrite.evidenceIds.map((id) => q.sources[q.evidenceIds!.indexOf(id)]),
+      };
+    });
+    const verified = questions.filter((q) => q.grounding === 'verified').length;
     return {
-      generation: 'ai',
-      notice: '이력서 경력 기반 AI 질문 · 경력 항목에 작성한 업무 경험만 사용한 초안입니다.',
-      questions: fallback.questions.map((q) => {
-        const rewrite = parsed.questions.find((r) => r.id === q.id);
-        return rewrite
-          ? { ...q, question: rewrite.question, followups: rewrite.followups, guide: rewrite.guide }
-          : q;
-      }),
+      generation: verified ? 'ai' : 'template',
+      notice:
+        verified === questions.length
+          ? '경력 기반 AI 질문 · 근거와의 맥락을 자동 검토한 초안입니다. 원문과 함께 확인해 주세요.'
+          : `경력 기반 질문 · AI 질문 ${verified}개, 맥락을 확인하지 못해 대체한 기본 질문 ${questions.length - verified}개입니다.`,
+      questions,
     };
   } catch {
     return {

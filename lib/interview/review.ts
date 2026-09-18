@@ -22,7 +22,11 @@ export function reviewQuestionStatus(question: InterviewQuestion, previous?: Int
   const old = previous.find((q) => q.id === question.id);
   if (!old) return 'excluded';
   if (old.edited) return 'kept';
-  return old.question === question.question &&
+  return old.topic === question.topic &&
+    old.reason === question.reason &&
+    JSON.stringify(old.sources) === JSON.stringify(question.sources) &&
+    old.grounding === question.grounding &&
+    old.question === question.question &&
     JSON.stringify(old.followups) === JSON.stringify(question.followups) &&
     JSON.stringify(old.guide) === JSON.stringify(question.guide)
     ? 'unchanged'

@@ -5,7 +5,7 @@ import { readSession } from '@/lib/auth/session';
 import { accessToken } from '@/lib/auth/backend';
 
 export const runtime = 'nodejs';
-export const maxDuration = 30;
+export const maxDuration = 60;
 const MAX_BODY = 180_000;
 // Local demo guardrails. Production requires authenticated users and a shared rate limiter.
 let windowStart = 0;

@@ -158,7 +158,7 @@ test('JD-only gives no questions; career evidence gives four personal questions'
   assert.ok(
     result.questions
       .filter((q) => q.kind === 'personal')
-      .every((q) => q.topic.includes('Java API를 구현') && q.sources.length > 0),
+      .every((q) => q.topic.length <= 30 && !q.topic.includes('구현하여') && q.sources.length > 0),
   );
   assert.ok(!result.questions.some((q) => q.kind === 'personal' && q.topicId === 'db'));
   const source = result.questions.flatMap((q) => q.sources)[0];
@@ -186,7 +186,10 @@ test('experience topics come from applicant text even without JD keyword matches
     assert.ok(!q.question.includes(q.sources[0].excerpt));
     assert.ok(q.question.length <= 80);
     assert.equal(q.question.split('?').length - 1, 1);
-    assert.equal(q.jdEvidence, q.topic.includes('요구사항') ? '고객 요구사항 조율 경험' : '');
+    assert.equal(
+      q.jdEvidence,
+      q.sources[0].excerpt.includes('요구사항') ? '고객 요구사항 조율 경험' : '',
+    );
   }
 });
 
@@ -278,12 +281,19 @@ test('only career sections reach question generation, excluding stronger non-car
       assert.ok(body.questions.every((q: { evidence: string[] }) => q.evidence[0] === career));
       assert.ok(!/200%|90%|80%|Docker|Redis|Kafka/.test(JSON.stringify(body)));
       return Response.json({
-        questions: body.questions.map((q: { id: string }) => ({
-          id: q.id,
-          question: '주문 API에서 직접 맡은 부분은 무엇인가요?',
-          followups: ['결과는 어떻게 확인하셨나요?'],
-          guide: ['담당 업무를 설명하세요.'],
-        })),
+        questions: body.questions.map(
+          (q: { id: string; experienceId: string; evidenceIds: string[] }) => ({
+            id: q.id,
+            experienceId: q.experienceId,
+            evidenceIds: q.evidenceIds,
+            title: '주문 API 성능 개선',
+            reason: '직접 담당한 API 개발 범위를 확인합니다.',
+            grounding: 'verified',
+            question: '주문 API에서 직접 맡은 부분은 무엇인가요?',
+            followups: ['결과는 어떻게 확인하셨나요?'],
+            guide: ['담당 업무를 설명하세요.'],
+          }),
+        ),
       });
     },
   });
@@ -459,7 +469,7 @@ test('provider uses only career evidence and keeps source metadata immutable', a
       assert.ok(
         seeds.every(
           (q) =>
-            q.topic.includes('Java API를 구현') &&
+            q.topic.length <= 30 &&
             q.evidence.includes('Java API를 구현하여 처리 시간을 개선했습니다.'),
         ),
       );
@@ -470,7 +480,12 @@ test('provider uses only career evidence and keeps source metadata immutable', a
           .filter((q) => q.kind === 'personal')
           .map((q) => ({
             id: q.id,
-            question: `${q.topic}에 대한 판단 이유를 설명해 주세요.`,
+            experienceId: q.topicId,
+            evidenceIds: q.evidenceIds,
+            title: 'Java API 성능 개선',
+            reason: '응답 시간 개선 과정을 확인합니다.',
+            grounding: 'verified',
+            question: 'API 처리 시간은 어떻게 개선하셨나요?',
             followups: ['대안은 무엇이었나요?'],
             guide: ['사례를 정리하세요.'],
             sources: [{ excerpt: 'invented' }],
@@ -490,6 +505,138 @@ test('provider uses only career evidence and keeps source metadata immutable', a
     base.questions.map((q) => q.sources),
   );
   assert.ok(!JSON.stringify(result).includes('invented'));
+  assert.equal(result.questions[0].topic, 'Java API 성능 개선');
+  assert.equal(result.questions[0].reason, '응답 시간 개선 과정을 확인합니다.');
+  assert.equal(result.questions[0].grounding, 'verified');
+});
+
+test('cross-experience citations and failed grounding fall back per question without losing valid questions', async () => {
+  const { input } = setup();
+  const base = templateQuestions(input);
+  const result = await generateInterview(input, {
+    serverUrl: 'http://server',
+    proxySecret: 'test',
+    fetch: async () =>
+      Response.json({
+        questions: base.questions.map((q, i) => ({
+          id: q.id,
+          experienceId: i === 0 ? 'other-experience' : q.topicId,
+          evidenceIds: i === 1 ? ['invented-evidence'] : q.evidenceIds,
+          title: 'API 성능 개선',
+          reason: '개선 과정을 확인합니다.',
+          question: 'API 처리 시간을 어떻게 개선하셨나요?',
+          followups: ['결과는 어떻게 확인하셨나요?'],
+          guide: ['개선 과정을 정리하세요.'],
+          grounding: i === 2 ? 'fallback' : 'verified',
+        })),
+      }),
+  });
+  assert.equal(result.generation, 'ai');
+  assert.match(result.notice, /AI 질문 1개.*기본 질문 3개/);
+  assert.deepEqual(result.questions.slice(0, 3), base.questions.slice(0, 3));
+  assert.equal(result.questions[3].grounding, 'verified');
+  assert.ok(!JSON.stringify(result).includes('invented-evidence'));
+});
+
+test('only cited original sources are displayed, never model supplied text', async () => {
+  const { input } = setup();
+  input.experienceTopics![0].sources.push({
+    ...input.experienceTopics![0].sources[0],
+    page: 3,
+    excerpt: '실행 계획을 분석하고 인덱스를 개선했습니다.',
+  });
+  const result = await generateInterview(input, {
+    serverUrl: 'http://server',
+    proxySecret: 'test',
+    fetch: async (_url, options) => {
+      const body = JSON.parse(options!.body as string);
+      return Response.json({
+        questions: body.questions.map(
+          (q: { id: string; experienceId: string; evidenceIds: string[] }) => ({
+            id: q.id,
+            experienceId: q.experienceId,
+            evidenceIds: [q.evidenceIds[1]],
+            title: '인덱스 개선',
+            reason: '선택 기준 확인',
+            grounding: 'verified',
+            question: '인덱스는 어떤 기준으로 개선하셨나요?',
+            followups: ['결과는 어떻게 확인하셨나요?'],
+            guide: ['개선 기준을 정리하세요.'],
+            sources: [{ excerpt: '위조 근거', page: 999 }],
+          }),
+        ),
+      });
+    },
+  });
+  assert.equal(result.generation, 'ai');
+  for (const q of result.questions) {
+    assert.deepEqual(q.sources, [input.experienceTopics![0].sources[1]]);
+    assert.equal(q.evidenceIds?.length, 1);
+  }
+  assert.ok(!JSON.stringify(result).includes('위조'));
+});
+
+test('all rejected questions are labeled template and old server responses cannot bypass review', async () => {
+  const { input } = setup();
+  const base = templateQuestions(input);
+  for (const legacy of [false, true]) {
+    const result = await generateInterview(input, {
+      serverUrl: 'http://server',
+      proxySecret: 'test',
+      fetch: async () =>
+        Response.json({
+          questions: base.questions.map((q) => ({
+            id: q.id,
+            question: '검토되지 않은 질문',
+            followups: q.followups,
+            guide: q.guide,
+            ...(!legacy && {
+              experienceId: q.topicId,
+              evidenceIds: q.evidenceIds,
+              title: 'API 개발',
+              reason: '업무 확인',
+              grounding: 'fallback',
+            }),
+          })),
+        }),
+    });
+    assert.equal(result.generation, 'template');
+    assert.deepEqual(result.questions, base.questions);
+    assert.ok(!JSON.stringify(result).includes('검토되지 않은 질문'));
+  }
+});
+
+test('title and citation changes are included in review status and persisted grounding survives reload', () => {
+  const { packet, db, p } = setup();
+  const q = packet.questions[0];
+  assert.equal(reviewQuestionStatus({ ...q, topic: 'API 개선' }, packet.questions), 'changed');
+  assert.equal(reviewQuestionStatus({ ...q, sources: [] }, packet.questions), 'changed');
+  const restored = parseProjects(JSON.stringify(saveInterview(db, p.id, packet, 0)));
+  assert.deepEqual(restored.projects[0].interviews?.[0].questions[0].evidenceIds, q.evidenceIds);
+  assert.equal(restored.projects[0].interviews?.[0].questions[0].grounding, 'fallback');
+});
+
+test('changed evidence or followups reset preparation even if the main question is unchanged', () => {
+  const { packet, input } = setup();
+  packet.questions[0].prepared = true;
+  packet.questions[0].assessment = 'confirmed';
+  packet.questions[0].note = '직접 작성한 면접 메모';
+  for (const change of ['source', 'followup']) {
+    const generated = templateQuestions(input);
+    if (change === 'source')
+      generated.questions[0].sources = [
+        {
+          ...generated.questions[0].sources[0],
+          page: 3,
+          excerpt: 'API 조회 결과를 검증했습니다.',
+        },
+      ];
+    else generated.questions[0].followups = ['직접 진행한 검증은 무엇인가요?'];
+    const result = regeneratePacket(packet, generated).questions[0];
+    assert.equal(result.prepared, false);
+    assert.equal(result.assessment, 'not-asked');
+    assert.equal(result.note, '직접 작성한 면접 메모');
+  }
 });
 
 test('provider refusal, failure, incomplete responses and invalid IDs fall back without leaking errors', async () => {

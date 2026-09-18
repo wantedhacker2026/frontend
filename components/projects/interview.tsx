@@ -39,7 +39,7 @@ async function generate(input: InterviewInput) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: key,
-        signal: AbortSignal.timeout(30000),
+        signal: AbortSignal.timeout(65_000),
       });
       if (response.status === 401) throw new Error('login-required');
       if (!response.ok) throw new Error('generation');
@@ -342,7 +342,11 @@ export function InterviewPanel({
           disabled={!hasCareer || busy || Boolean(review) || !reviewReady}
           onClick={createOrRegenerate}
         >
-          {busy ? '질문 생성 중…' : recruiter ? '면접 대상으로 선택 · 질문 생성' : '예상 질문 생성'}
+          {busy
+            ? '질문 생성·근거 확인 중…'
+            : recruiter
+              ? '면접 대상으로 선택 · 질문 생성'
+              : '예상 질문 생성'}
         </Button>
       ) : (
         <>
@@ -492,6 +496,11 @@ export function InterviewPanel({
                     </div>
                   )}
                 </div>
+                {!q.edited && q.grounding && (
+                  <small>
+                    {q.grounding === 'verified' ? 'AI 질문 · 맥락 자동 검토' : '기본 질문'}
+                  </small>
+                )}
                 {recruiter && !locked ? (
                   <SavedText
                     key={`${q.id}:question:${q.question}`}
@@ -509,11 +518,7 @@ export function InterviewPanel({
                 <details>
                   <summary>질문 근거 보기</summary>
                   <div className="interview-evidence">
-                    <strong>연결된 JD</strong>
-                    <blockquote>
-                      {q.jdEvidence ||
-                        `${q.topic} · 사용자가 지정한 기준으로, 일치하는 JD 문장은 없습니다.`}
-                    </blockquote>
+                    <strong>질문의 근거가 된 경력 원문</strong>
                     {q.sources.length ? (
                       q.sources.map((s, i) => (
                         <div key={i}>
@@ -529,6 +534,12 @@ export function InterviewPanel({
                           ? 'JD 기반 공통 질문입니다.'
                           : '확인 가능한 지원서 원문이 없습니다. 경험이 없다고 판단하지 않습니다.'}
                       </p>
+                    )}
+                    {q.jdEvidence && (
+                      <>
+                        <strong>관련 공고 내용 · 참고</strong>
+                        <blockquote>{q.jdEvidence}</blockquote>
+                      </>
                     )}
                   </div>
                 </details>

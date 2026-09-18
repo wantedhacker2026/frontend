@@ -40,6 +40,9 @@ export const questionSchema = z.object({
   reason: z.string().max(1500),
   jdEvidence: z.string().max(1500),
   sources: z.array(interviewSourceSchema).max(2),
+  // Optional for previously saved packets. Original source text is never supplied by AI.
+  evidenceIds: z.array(z.string()).max(2).optional(),
+  grounding: z.enum(['verified', 'fallback']).optional(),
   followups: z.array(z.string().min(1).max(500)).min(1).max(3),
   guide: z.array(z.string().min(1).max(500)).min(1).max(4),
   note: z.string().max(10000),

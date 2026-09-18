@@ -76,6 +76,11 @@ export function InterviewReviewDialog({
                 </h3>
                 <span>{statusNames[status]}</span>
               </div>
+              {q.grounding && (
+                <small>
+                  {q.grounding === 'verified' ? 'AI 질문 · 맥락 자동 검토' : '기본 질문'}
+                </small>
+              )}
               <div className={`interview-review-comparison ${old ? 'has-previous' : ''}`}>
                 {old && (
                   <section>
@@ -123,7 +128,7 @@ export function InterviewReviewDialog({
               <details>
                 <summary>질문 이유와 근거</summary>
                 <p>{q.reason}</p>
-                <blockquote>{q.jdEvidence || `${q.topic} 평가 기준`}</blockquote>
+                <strong>질문의 근거가 된 경력 원문</strong>
                 {q.sources.length ? (
                   q.sources.map((source, i) => (
                     <div key={i}>
@@ -136,6 +141,7 @@ export function InterviewReviewDialog({
                 ) : (
                   <p>지원서 원문 근거가 없는 질문입니다. 실제 경험은 면접에서 확인하세요.</p>
                 )}
+                {q.jdEvidence && <p>관련 공고 내용 · 참고: {q.jdEvidence}</p>}
               </details>
             </article>
           );

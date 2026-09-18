@@ -110,14 +110,14 @@ export function templateQuestions(input: InterviewInput): InterviewGeneration {
     };
   const personalPrompts = [
     '이 경험에서 직접 맡은 일은 무엇인가요?',
-    '그 방법을 선택한 이유는 무엇인가요?',
-    '진행하면서 가장 어려웠던 점은 무엇인가요?',
+    '이 업무는 어떤 순서로 진행하셨나요?',
+    '이 업무에서 다른 사람과 함께 진행한 부분이 있었나요?',
     '작업 결과는 어떻게 확인하셨나요?',
   ];
   const personalFollowups = [
     ['처음 해결하려던 문제는 무엇이었나요?', '직접 맡은 부분은 어떻게 진행하셨나요?'],
-    ['다른 방법도 검토하셨나요?', '선택에 가장 크게 영향을 준 조건은 무엇인가요?'],
-    ['어떤 방식으로 풀어가셨나요?', '그 방법이 효과가 있었는지 어떻게 확인하셨나요?'],
+    ['진행할 때 중요하게 고려한 조건은 무엇인가요?', '그 조건은 작업에 어떤 영향을 주었나요?'],
+    ['함께 진행했다면 역할은 어떻게 나누셨나요?', '직접 진행한 부분은 무엇인가요?'],
     ['어떤 기준으로 결과를 판단하셨나요?', '다시 한다면 어떤 부분을 바꾸고 싶나요?'],
   ];
   function question(index: number): InterviewQuestion {
@@ -128,12 +128,19 @@ export function templateQuestions(input: InterviewInput): InterviewGeneration {
     return {
       id: `personal-${index}`,
       topicId: topic.id,
-      topic: topic.name,
+      topic: [
+        '경력 업무의 담당 역할',
+        '경력 업무의 진행 과정',
+        '경력 업무의 협업 범위',
+        '경력 업무의 결과 확인',
+      ][index % 4],
       kind: 'personal',
       question: personalPrompts[index % 4],
       reason,
       jdEvidence: topic.jdEvidence,
       sources,
+      evidenceIds: sources.map((_, i) => `${topic.id}:evidence-${i}`),
+      grounding: 'fallback',
       followups: personalFollowups[index % 4],
       guide: [
         '상황과 목표를 짧게 정리하세요.',
@@ -227,7 +234,12 @@ export function regeneratePacket(
     questions: packet.questions.map((old) => {
       const fresh = generation.questions.find((q) => q.id === old.id);
       if (old.edited || !fresh) return old;
-      const unchanged = old.question === fresh.question;
+      const unchanged =
+        old.question === fresh.question &&
+        old.topicId === fresh.topicId &&
+        JSON.stringify(old.sources) === JSON.stringify(fresh.sources) &&
+        JSON.stringify(old.followups) === JSON.stringify(fresh.followups) &&
+        JSON.stringify(old.guide) === JSON.stringify(fresh.guide);
       return {
         ...fresh,
         note: old.note,
