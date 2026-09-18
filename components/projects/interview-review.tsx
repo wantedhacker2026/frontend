@@ -3,6 +3,8 @@ import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import type { InterviewGeneration, InterviewQuestion } from '@/lib/interview/types';
 import { reviewQuestionStatus } from '@/lib/interview/review';
+import type { EvidenceContext } from '@/lib/interview/evidence';
+import { InterviewSourceEvidence } from './interview-evidence';
 
 const statusNames = {
   new: '새 질문',
@@ -17,6 +19,7 @@ export function InterviewReviewDialog({
   result,
   prompt,
   previous,
+  sourceContext,
   error,
   onApply,
   onDiscard,
@@ -27,6 +30,7 @@ export function InterviewReviewDialog({
   result: InterviewGeneration;
   prompt: string;
   previous?: InterviewQuestion[];
+  sourceContext: EvidenceContext;
   error?: string;
   onApply: () => void;
   onDiscard: () => void;
@@ -125,24 +129,22 @@ export function InterviewReviewDialog({
                     : '이전에 삭제한 질문입니다. 적용해도 복원되지 않습니다.'}
                 </p>
               )}
-              <details>
-                <summary>질문 이유와 근거</summary>
+              <section
+                className="interview-evidence"
+                aria-label={`${index + 1}번 생성 질문의 경력 근거`}
+              >
+                <strong>이 경력에서 질문한 이유</strong>
                 <p>{q.reason}</p>
                 <strong>질문의 근거가 된 경력 원문</strong>
                 {q.sources.length ? (
                   q.sources.map((source, i) => (
-                    <div key={i}>
-                      <strong>
-                        {source.filename} · {source.page}페이지
-                      </strong>
-                      <blockquote>{source.excerpt}</blockquote>
-                    </div>
+                    <InterviewSourceEvidence key={i} context={sourceContext} source={source} />
                   ))
                 ) : (
                   <p>지원서 원문 근거가 없는 질문입니다. 실제 경험은 면접에서 확인하세요.</p>
                 )}
                 {q.jdEvidence && <p>관련 공고 내용 · 참고: {q.jdEvidence}</p>}
-              </details>
+              </section>
             </article>
           );
         })}

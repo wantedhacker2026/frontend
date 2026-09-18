@@ -1,6 +1,7 @@
 'use client';
 import { authenticatedFetch } from '@/lib/auth/client';
 import { InterviewReviewDialog } from './interview-review';
+import { CareerEvidenceSummary, InterviewSourceEvidence } from './interview-evidence';
 import {
   applyInterviewReview,
   interviewReviewSchema,
@@ -8,7 +9,7 @@ import {
   type InterviewReview,
 } from '@/lib/interview/review';
 import { InterviewPrompt } from './interview-prompt';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { MessageSquare, RefreshCw, Copy, Printer, ArrowUp, ArrowDown, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useProjects } from '@/lib/projects/store';
@@ -75,6 +76,8 @@ export function InterviewPanel({
   const [prompt, setPrompt] = useState(project.interviewPrompt ?? '');
   const packet = project.interviews?.find((p) => p.key === packetKey(revision.id, analysis.id));
   const recruiter = project.role === 'recruiter';
+  const questionPrefix = useId();
+  const sourceContext = { revision, personId: analysis.personId };
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -242,7 +245,7 @@ export function InterviewPanel({
           {error}
         </p>
       )}
-      {!hasCareer && (
+      {!hasCareer && !recruiter && (
         <p className="project-notice" role="status">
           {templateQuestions(input).notice}
         </p>
@@ -252,6 +255,14 @@ export function InterviewPanel({
           질문 기준이 경력 항목으로 변경되었습니다. 이전 질문과 메모는 저장 데이터에 보존되며, 새
           기준의 질문지를 별도로 생성합니다.
         </p>
+      )}
+      {recruiter && (
+        <CareerEvidenceSummary
+          context={sourceContext}
+          topics={input.experienceTopics ?? []}
+          questions={packet?.questions ?? []}
+          questionPrefix={questionPrefix}
+        />
       )}
       <details className="project-criteria-editor">
         <summary>질문 생성 지침 관리</summary>
@@ -321,6 +332,7 @@ export function InterviewPanel({
             result={review.result}
             prompt={review.prompt}
             previous={packet?.questions}
+            sourceContext={sourceContext}
             disabled={staleReview}
             error={
               staleReview
@@ -455,7 +467,12 @@ export function InterviewPanel({
           <small>다시 생성해도 수정한 질문, 삭제한 질문의 제외 상태와 메모는 유지됩니다.</small>
           <div className="interview-questions">
             {packet.questions.map((q, index) => (
-              <article className="interview-question" key={q.id}>
+              <article
+                className="interview-question"
+                key={q.id}
+                id={`${questionPrefix}-question-${index + 1}`}
+                tabIndex={-1}
+              >
                 <div className="interview-question-heading">
                   <span>{String(index + 1).padStart(2, '0')}</span>
                   <strong>
@@ -515,34 +532,29 @@ export function InterviewPanel({
                   <h3>{q.question}</h3>
                 )}
                 <p className="interview-reason">{q.reason}</p>
-                <details>
-                  <summary>질문 근거 보기</summary>
-                  <div className="interview-evidence">
-                    <strong>질문의 근거가 된 경력 원문</strong>
-                    {q.sources.length ? (
-                      q.sources.map((s, i) => (
-                        <div key={i}>
-                          <strong>
-                            {s.filename} · {s.page}페이지
-                          </strong>
-                          <blockquote>{s.excerpt}</blockquote>
-                        </div>
-                      ))
-                    ) : (
-                      <p>
-                        {q.kind === 'common'
-                          ? 'JD 기반 공통 질문입니다.'
-                          : '확인 가능한 지원서 원문이 없습니다. 경험이 없다고 판단하지 않습니다.'}
-                      </p>
-                    )}
-                    {q.jdEvidence && (
-                      <>
-                        <strong>관련 공고 내용 · 참고</strong>
-                        <blockquote>{q.jdEvidence}</blockquote>
-                      </>
-                    )}
-                  </div>
-                </details>
+                <section
+                  className="interview-evidence"
+                  aria-label={`${index + 1}번 질문의 경력 근거`}
+                >
+                  <strong>질문의 근거가 된 경력 원문</strong>
+                  {q.sources.length ? (
+                    q.sources.map((s, i) => (
+                      <InterviewSourceEvidence key={i} context={sourceContext} source={s} />
+                    ))
+                  ) : (
+                    <p>
+                      {q.kind === 'common'
+                        ? 'JD 기반 공통 질문입니다.'
+                        : '확인 가능한 지원서 원문이 없습니다. 경험이 없다고 판단하지 않습니다.'}
+                    </p>
+                  )}
+                  {q.jdEvidence && (
+                    <>
+                      <strong>관련 공고 내용 · 참고</strong>
+                      <blockquote>{q.jdEvidence}</blockquote>
+                    </>
+                  )}
+                </section>
                 <div className="interview-guidance">
                   <strong>{recruiter ? '후속 질문' : '답변 준비 가이드'}</strong>
                   <ul>
