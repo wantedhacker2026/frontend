@@ -11,7 +11,6 @@ import {
   revisionDraft,
   validateDraft,
 } from '@/lib/projects/domain';
-import { demoDraft } from '@/lib/projects/demo';
 import { MAX_ANALYSIS_CRITERIA } from '@/lib/evaluation/limits';
 import {
   getJobProfile,
@@ -215,22 +214,6 @@ function ProjectForm({
               : '비로그인 · 작성 후 로그인하면 분석할 수 있어요.'}
           </p>
         </div>
-        {!previous && (
-          <Button
-            variant="outline"
-            disabled={reading || stage !== null}
-            onClick={() => {
-              const sample = demoDraft(
-                actor ?? { id: 'guest', name: '지원자', role: 'applicant', provider: '데모' },
-              );
-              setDraft(sample);
-              setDirty(true);
-              setGrouped(false);
-            }}
-          >
-            예시로 채우기{actor?.role === 'recruiter' ? ' · 20명' : ''}
-          </Button>
-        )}
       </div>
       {previous && (
         <div className="project-notice">
