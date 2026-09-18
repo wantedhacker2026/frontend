@@ -15,6 +15,7 @@ export const interviewTopicSchema = z.object({
 });
 // Only job-related context crosses the generation boundary; no scores, names or private notes.
 export const interviewInputSchema = z.object({
+  sourceScope: z.literal('career'),
   prompt: z.string().max(2000).optional(),
   role: z.enum(['applicant', 'recruiter']),
   topics: z.array(interviewTopicSchema).min(1).max(30),
@@ -65,6 +66,6 @@ export type InterviewPacket = z.infer<typeof packetSchema>;
 export const generationSchema = z.object({
   generation: z.enum(['template', 'ai']),
   notice: z.string(),
-  questions: z.array(questionSchema).min(1).max(10),
+  questions: z.array(questionSchema).max(10),
 });
 export type InterviewGeneration = z.infer<typeof generationSchema>;

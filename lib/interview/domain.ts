@@ -13,7 +13,7 @@ import {
 } from './types';
 import { extractExperienceTopics } from './experiences';
 
-export const INTERVIEW_VERSION = 'interview-v1';
+export const INTERVIEW_VERSION = 'interview-career-v2';
 export const assessmentNames = {
   'not-asked': '아직 질문 전',
   confirmed: '구체적 사례 확인',
@@ -31,6 +31,10 @@ export function buildInterviewInput(
   analysis?: ProjectAnalysis,
 ): InterviewInput {
   const criteria = project.criteria.slice(0, 30);
+  const experienceTopics =
+    revision && analysis
+      ? extractExperienceTopics(revision, analysis.personId, criteria, project.jd.text)
+      : [];
   const topics = criteria.map((c) => {
     const result = analysis?.results.find((r) => r.criterionId === c.id);
     const sources = (result?.sources ?? [])
@@ -40,6 +44,14 @@ export function buildInterviewInput(
             d.id === s.documentId && d.applicantId === analysis?.personId && d.status === 'ready',
         );
         return Boolean(
+          experienceTopics.some((t) =>
+            t.sources.some(
+              (career) =>
+                career.documentId === s.documentId &&
+                career.page === s.page &&
+                career.excerpt.includes(s.excerpt),
+            ),
+          ) &&
           s.excerpt.trim() &&
           s.page > 0 &&
           doc?.pages.some((p) => p.number === s.page && p.text.includes(s.excerpt)),
@@ -76,13 +88,11 @@ export function buildInterviewInput(
     };
   });
   return {
+    sourceScope: 'career',
     prompt: project.interviewPrompt ?? '',
     role: project.role,
     topics,
-    experienceTopics:
-      revision && analysis
-        ? extractExperienceTopics(revision, analysis.personId, criteria, project.jd.text)
-        : [],
+    experienceTopics,
     // Retained for older clients; personal questions now select from experienceTopics.
     priorityIds: criteria.map((c) => c.id),
     personalized: Boolean(analysis),
@@ -90,15 +100,14 @@ export function buildInterviewInput(
 }
 
 export function templateQuestions(input: InterviewInput): InterviewGeneration {
-  const commonPrompts = [
-    (name: string) => `${name} 관련 업무를 시작할 때 무엇부터 확인하시겠어요?`,
-    (name: string) => `${name} 업무에서 일정과 품질이 충돌하면 무엇을 우선하시겠어요?`,
-    (name: string) => `${name} 업무의 결과가 잘 나왔는지 어떻게 확인하시겠어요?`,
-    (name: string) => `${name} 업무에서 예상과 다른 결과가 나오면 어떻게 대응하시겠어요?`,
-    (name: string) => `${name} 업무에서 동료와 의견이 다르면 어떻게 조율하시겠어요?`,
-    (name: string) => `${name} 업무에서 먼저 개선하고 싶은 부분은 무엇인가요?`,
-  ];
-  const experiences = input.experienceTopics ?? [];
+  const experiences = input.sourceScope === 'career' ? (input.experienceTopics ?? []) : [];
+  if (!input.personalized || !experiences.length)
+    return {
+      generation: 'template',
+      notice:
+        '이력서의 경력 항목에서 구체적인 업무 경험을 찾지 못했습니다. 경력 또는 Work Experience 제목 아래에 담당 업무와 수행 내용을 작성해 주세요.',
+      questions: [],
+    };
   const personalPrompts = [
     '이 경험에서 직접 맡은 일은 무엇인가요?',
     '그 방법을 선택한 이유는 무엇인가요?',
@@ -111,30 +120,25 @@ export function templateQuestions(input: InterviewInput): InterviewGeneration {
     ['어떤 방식으로 풀어가셨나요?', '그 방법이 효과가 있었는지 어떻게 확인하셨나요?'],
     ['어떤 기준으로 결과를 판단하셨나요?', '다시 한다면 어떤 부분을 바꾸고 싶나요?'],
   ];
-  function question(index: number, personal: boolean): InterviewQuestion {
-    const topic = personal
-      ? experiences[index % experiences.length]
-      : input.topics[index % input.topics.length];
-    const sources = personal ? topic.sources : [];
-    const reason = !personal
-      ? '채용공고의 직무 수행 방식과 판단 기준을 준비하는 공통 질문입니다.'
-      : '지원서에 작성한 경험을 주제로 선정했습니다. 실제 역할, 판단 과정과 결과를 구체적으로 확인합니다.';
+  function question(index: number): InterviewQuestion {
+    const topic = experiences[index % experiences.length];
+    const sources = topic.sources;
+    const reason =
+      '이력서의 경력 항목에 작성한 업무 경험을 바탕으로 실제 역할, 판단 과정과 결과를 확인합니다.';
     return {
-      id: `${personal ? 'personal' : 'common'}-${index}`,
+      id: `personal-${index}`,
       topicId: topic.id,
       topic: topic.name,
-      kind: personal ? 'personal' : 'common',
-      question: personal ? personalPrompts[index % 4] : commonPrompts[index % 6](topic.name),
+      kind: 'personal',
+      question: personalPrompts[index % 4],
       reason,
       jdEvidence: topic.jdEvidence,
       sources,
-      followups: personal
-        ? personalFollowups[index % 4]
-        : ['그렇게 생각한 이유는 무엇인가요?', '비슷한 상황을 겪어본 적이 있나요?'],
+      followups: personalFollowups[index % 4],
       guide: [
         '상황과 목표를 짧게 정리하세요.',
         '직접 한 행동과 선택 이유를 구분하세요.',
-        '확인 가능한 결과와 배운 점을 준비하세요. 경험이 없다면 가정임을 밝혀 접근 방법을 설명하세요.',
+        '경력에 작성한 업무의 확인 가능한 결과와 배운 점을 준비하세요.',
       ],
       note: '',
       prepared: false,
@@ -142,21 +146,10 @@ export function templateQuestions(input: InterviewInput): InterviewGeneration {
       assessment: 'not-asked',
     };
   }
-  const questions = Array.from({ length: 3 }, (_, i) => question(i, false));
-  if (input.personalized && experiences.length)
-    questions.push(...Array.from({ length: 4 }, (_, i) => question(i, true)));
-  else if (input.personalized)
-    return {
-      generation: 'template',
-      notice:
-        '지원서에서 구체적인 수행 경험을 추출하지 못해 공통 질문만 표시합니다. 프로젝트·역할·수행 내용이 적힌 서류를 등록해 주세요.',
-      questions,
-    };
-  else questions.push(...Array.from({ length: 3 }, (_, i) => question(i + 3, false)));
   return {
     generation: 'template',
-    notice: '기본 질문 · JD와 서류 근거를 이용한 규칙 기반 질문입니다.',
-    questions,
+    notice: '경력 기반 기본 질문 · 이력서의 경력 항목에 작성한 업무 경험만 사용합니다.',
+    questions: Array.from({ length: 4 }, (_, i) => question(i)),
   };
 }
 
@@ -166,6 +159,7 @@ export function newPacket(
   analysis: ProjectAnalysis,
   generation: InterviewGeneration,
 ): InterviewPacket {
+  if (!generation.questions.length) throw new Error('경력 항목에 질문할 업무 경험이 없습니다.');
   const now = new Date().toISOString();
   return {
     ...generation,

@@ -26,12 +26,10 @@ export async function generateInterview(
   } = {},
 ): Promise<InterviewGeneration> {
   const fallback = templateQuestions(input);
-  if (input.personalized && !input.experienceTopics?.length) return fallback;
+  if (!fallback.questions.length) return fallback;
   if (!options.serverUrl || !options.proxySecret)
     return { ...fallback, notice: 'AI 서버 연결 설정이 필요해 기본 질문을 표시합니다.' };
-  const editable = fallback.questions.filter(
-    (q) => input.role === 'applicant' || q.kind === 'personal',
-  );
+  const editable = fallback.questions;
   if (!editable.length) return fallback;
   try {
     const response = await (options.fetch ?? fetch)(
@@ -73,12 +71,7 @@ export async function generateInterview(
       throw new Error('ids');
     return {
       generation: 'ai',
-      notice:
-        input.role === 'recruiter'
-          ? '공통 질문은 고정 기준, 개인별 질문은 지원서에 작성한 경험을 바탕으로 만든 AI 초안입니다.'
-          : input.personalized
-            ? '지원서 경험 기반 AI 예상 질문 · 실제 면접 질문과 다를 수 있습니다.'
-            : 'JD 기반 AI 예상 질문 · 실제 면접 질문과 다를 수 있습니다.',
+      notice: '이력서 경력 기반 AI 질문 · 경력 항목에 작성한 업무 경험만 사용한 초안입니다.',
       questions: fallback.questions.map((q) => {
         const rewrite = parsed.questions.find((r) => r.id === q.id);
         return rewrite

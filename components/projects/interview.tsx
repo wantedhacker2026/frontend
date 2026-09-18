@@ -8,16 +8,11 @@ import {
   type InterviewReview,
 } from '@/lib/interview/review';
 import { InterviewPrompt } from './interview-prompt';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { MessageSquare, RefreshCw, Copy, Printer, ArrowUp, ArrowDown, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useProjects } from '@/lib/projects/store';
-import type {
-  AnalysisProject,
-  ProjectAnalysis,
-  ProjectDraft,
-  ProjectRevision,
-} from '@/lib/projects/types';
+import type { AnalysisProject, ProjectAnalysis, ProjectRevision } from '@/lib/projects/types';
 import {
   assessmentNames,
   buildInterviewInput,
@@ -67,109 +62,6 @@ async function generate(input: InterviewInput) {
   }
 }
 
-export function JDInterviewPreview({ draft }: { draft: ProjectDraft }) {
-  const [proposal, setProposal] = useState<{
-    key: string;
-    prompt: string;
-    result: InterviewGeneration;
-  } | null>(null);
-  const [reviewOpen, setReviewOpen] = useState(false);
-  const [preview, setPreview] = useState<{ key: string; result: InterviewGeneration } | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  if (draft.jd.text.trim().length < 20 || !draft.criteria.some((c) => c.name.trim())) return null;
-  const input = buildInterviewInput({
-    role: 'applicant',
-    interviewPrompt: draft.interviewPrompt,
-    jd: draft.jd,
-    criteria: draft.criteria.filter((c) => c.name.trim()),
-  });
-  const key = JSON.stringify(input);
-  const basic = preview?.key === key ? preview.result : templateQuestions(input);
-  return (
-    <section className="interview-panel interview-preview" aria-label="JD 기반 면접 준비">
-      <div className="interview-heading">
-        <MessageSquare size={22} />
-        <div>
-          <h2>이 공고의 예상 면접 질문</h2>
-          <p>
-            서류 등록 전에도 준비할 수 있는 JD 기반 기본 질문입니다. 분석을 마치면 내 경험에 맞춘
-            질문이 추가됩니다.
-          </p>
-        </div>
-      </div>
-      <Button
-        type="button"
-        disabled={busy || Boolean(proposal)}
-        onClick={async () => {
-          setBusy(true);
-          setError('');
-          try {
-            setProposal({ key, prompt: input.prompt ?? '', result: await generate(input) });
-            setReviewOpen(true);
-          } catch (e) {
-            setError((e as Error).message);
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
-        {busy ? 'AI 질문 생성 중…' : 'AI로 질문 생성'}
-      </Button>
-      {proposal && (
-        <>
-          <div className="interview-review-banner">
-            <p>생성된 질문 {proposal.result.questions.length}개가 검토를 기다리고 있습니다.</p>
-            <Button type="button" onClick={() => setReviewOpen(true)}>
-              생성 결과 확인
-            </Button>
-          </div>
-          <InterviewReviewDialog
-            open={reviewOpen}
-            onOpenChange={setReviewOpen}
-            result={proposal.result}
-            prompt={proposal.prompt}
-            previous={basic.questions}
-            previewOnly
-            disabled={proposal.key !== key}
-            error={
-              proposal.key !== key
-                ? 'JD 또는 지침이 변경되었습니다. 취소한 뒤 다시 생성해 주세요.'
-                : undefined
-            }
-            onDiscard={() => {
-              setProposal(null);
-              setReviewOpen(false);
-            }}
-            onApply={() => {
-              if (proposal.key === key) {
-                setPreview({ key, result: proposal.result });
-                setProposal(null);
-                setReviewOpen(false);
-              }
-            }}
-          />
-        </>
-      )}
-      <p role="status">{basic.notice}</p>
-      {error && (
-        <p role="alert" className="project-error">
-          {error}
-        </p>
-      )}
-      <ol className="interview-preview-list">
-        {basic.questions.map((q) => (
-          <li key={q.id}>
-            <strong>{q.question}</strong>
-            <p>{q.jdEvidence || `${q.topic} 기준에 연결된 질문`}</p>
-          </li>
-        ))}
-      </ol>
-      <small>실제 채용담당자의 질문과 다를 수 있습니다.</small>
-    </section>
-  );
-}
-
 export function InterviewPanel({
   project,
   revision,
@@ -193,6 +85,14 @@ export function InterviewPanel({
   const storageKey = reviewStorageKey(project, reviewKey);
   const attempted = useRef(false);
   const lock = useRef(false);
+  const input = useMemo(
+    () => buildInterviewInput({ ...project, interviewPrompt: prompt }, revision, analysis),
+    [project, prompt, revision, analysis],
+  );
+  const hasCareer = Boolean(input.experienceTopics?.length);
+  const hasPreviousQuestions = project.interviews?.some(
+    (p) => p.revisionId === revision.id && p.analysisId === analysis.id && p.key !== reviewKey,
+  );
 
   /* eslint-disable react-hooks/set-state-in-effect -- Restore generated drafts from external tab storage. */
   useEffect(() => {
@@ -237,16 +137,19 @@ export function InterviewPanel({
     }
   }
   async function createOrRegenerate() {
-    if (lock.current || review || !reviewReady) return;
+    if (lock.current || review || !reviewReady || !hasCareer) return;
     lock.current = true;
     attempted.current = true;
     setBusy(true);
     setError('');
     setMessage('');
-    const input = buildInterviewInput({ ...project, interviewPrompt: prompt }, revision, analysis);
     try {
       commitInterviewPrompt(project.id, prompt, project.interviewPrompt ?? '');
       const result = await generate(input);
+      if (!result.questions.length) {
+        setMessage(result.notice);
+        return;
+      }
       const draft = {
         key: reviewKey,
         baseVersion: packet?.version ?? 0,
@@ -269,11 +172,11 @@ export function InterviewPanel({
     }
   }
   useEffect(() => {
-    if (reviewReady && !recruiter && !packet && !review && !attempted.current)
+    if (hasCareer && reviewReady && !recruiter && !packet && !review && !attempted.current)
       void createOrRegenerate();
     // Initialize only once per analysis; pending review drafts survive page reloads.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reviewReady, recruiter, packet, review]);
+  }, [hasCareer, reviewReady, recruiter, packet, review]);
 
   function update(next: InterviewPacket) {
     if (!packet) return;
@@ -316,8 +219,8 @@ export function InterviewPanel({
           <h2>{recruiter ? '면접 준비' : '예상 면접 질문'}</h2>
           <p>
             {recruiter
-              ? '공통 질문과 지원서에 작성한 프로젝트·수행 경험을 바탕으로 한 질문을 준비하세요.'
-              : '질문의 이유를 확인하고, 자신의 경험으로 답변을 준비하세요.'}
+              ? '이력서의 경력 항목에 작성한 담당 업무와 수행 경험으로 면접을 준비하세요.'
+              : '이력서의 경력 항목을 바탕으로 만든 질문과 원문 근거를 확인하세요.'}
           </p>
         </div>
         {packet && (
@@ -337,6 +240,17 @@ export function InterviewPanel({
       {error && (
         <p role="alert" className="project-error">
           {error}
+        </p>
+      )}
+      {!hasCareer && (
+        <p className="project-notice" role="status">
+          {templateQuestions(input).notice}
+        </p>
+      )}
+      {!packet && hasPreviousQuestions && (
+        <p className="project-notice">
+          질문 기준이 경력 항목으로 변경되었습니다. 이전 질문과 메모는 저장 데이터에 보존되며, 새
+          기준의 질문지를 별도로 생성합니다.
         </p>
       )}
       <details className="project-criteria-editor">
@@ -425,7 +339,7 @@ export function InterviewPanel({
       {!packet ? (
         <Button
           type="button"
-          disabled={busy || Boolean(review) || !reviewReady}
+          disabled={!hasCareer || busy || Boolean(review) || !reviewReady}
           onClick={createOrRegenerate}
         >
           {busy ? '질문 생성 중…' : recruiter ? '면접 대상으로 선택 · 질문 생성' : '예상 질문 생성'}
@@ -442,7 +356,9 @@ export function InterviewPanel({
               type="button"
               size="sm"
               variant="outline"
-              disabled={busy || Boolean(review) || !reviewReady || (recruiter && locked)}
+              disabled={
+                !hasCareer || busy || Boolean(review) || !reviewReady || (recruiter && locked)
+              }
               onClick={createOrRegenerate}
             >
               <RefreshCw size={14} />

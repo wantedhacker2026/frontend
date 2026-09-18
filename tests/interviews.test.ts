@@ -82,7 +82,9 @@ function fixture(role: 'applicant' | 'recruiter' = 'recruiter'): AnalysisProject
             size: 20,
             status: 'ready',
             source: 'text',
-            pages: [{ number: 2, text: 'Java API를 구현하여 처리 시간을 개선했습니다.' }],
+            pages: [
+              { number: 2, text: '경력 사항\nJava API를 구현하여 처리 시간을 개선했습니다.' },
+            ],
           },
         ],
         analyses: [
@@ -146,12 +148,12 @@ function setup(role: 'applicant' | 'recruiter' = 'recruiter') {
   return { p, r, a, input, packet, db };
 }
 
-test('JD-only gives six questions; personalized gives three common and four evidence questions', () => {
+test('JD-only gives no questions; career evidence gives four personal questions', () => {
   const { p, input } = setup();
-  assert.equal(templateQuestions(buildInterviewInput(p)).questions.length, 6);
+  assert.equal(templateQuestions(buildInterviewInput(p)).questions.length, 0);
   const result = templateQuestions(input);
-  assert.equal(result.questions.length, 7);
-  assert.equal(result.questions.filter((q) => q.kind === 'common').length, 3);
+  assert.equal(result.questions.length, 4);
+  assert.equal(result.questions.filter((q) => q.kind === 'common').length, 0);
   assert.match(result.questions.find((q) => q.kind === 'personal')!.topicId, /^experience-/);
   assert.ok(
     result.questions
@@ -172,7 +174,7 @@ test('experience topics come from applicant text even without JD keyword matches
     '금융 고객과 요구사항을 조율하고 프로젝트 일정을 관리했습니다.',
     'Figma 프로토타입을 제작하여 사용자 테스트를 수행했습니다.',
   ];
-  r.documents[0].pages = [{ number: 1, text: experiences.join('\n') }];
+  r.documents[0].pages = [{ number: 1, text: ['경력', ...experiences].join('\n') }];
   a.results = [];
   const input = buildInterviewInput(p, r, a);
   assert.equal(input.experienceTopics?.length, 4);
@@ -190,11 +192,12 @@ test('experience topics come from applicant text even without JD keyword matches
 
 test('experience extraction deduplicates evidence and excludes other applicants, unreadable pages and identity', () => {
   const { p, r, a } = setup();
-  const original = r.documents[0].pages[0].text;
+  const original = 'Java API를 구현하여 처리 시간을 개선했습니다.';
   r.documents[0].pages = [
     {
       number: 1,
       text: [
+        '경력',
         original,
         original,
         '이름: 홍길동 개발자',
@@ -236,9 +239,128 @@ test('without written experiences no personal questions are invented and AI is n
       throw new Error('must not call');
     },
   });
-  assert.equal(result.questions.length, 3);
+  assert.equal(result.questions.length, 0);
   assert.ok(result.questions.every((q) => q.kind === 'common'));
-  assert.match(result.notice, /수행 경험을 추출하지 못해/);
+  assert.match(result.notice, /경력 항목에서/);
+});
+
+test('only career sections reach question generation, excluding stronger non-career examples', async () => {
+  const { p, r, a } = setup();
+  const career = 'Spring Boot 주문 API를 구현하고 조회 시간을 개선했습니다.';
+  r.documents[0].pages = [
+    {
+      number: 1,
+      text: [
+        '자기소개',
+        'Redis 캐시를 설계하여 처리량을 200% 개선했습니다.',
+        '## 경력 사항 (4년)',
+        career,
+        '학력',
+        '학교에서 Kafka 서버를 설계하고 처리 시간을 90% 단축했습니다.',
+        '개인 프로젝트',
+        'Docker 배포를 자동화하여 시간을 80% 단축했습니다.',
+        '기술 스택',
+        'MySQL 데이터베이스를 설계했습니다.',
+      ].join('\n'),
+    },
+  ];
+  const input = buildInterviewInput(p, r, a);
+  assert.deepEqual(
+    input.experienceTopics?.map((t) => t.sources[0].excerpt),
+    [career],
+  );
+  const result = await generateInterview(input, {
+    serverUrl: 'http://server',
+    proxySecret: 'test',
+    fetch: async (_url, options) => {
+      const body = JSON.parse(options!.body as string);
+      assert.equal(body.questions.length, 4);
+      assert.ok(body.questions.every((q: { evidence: string[] }) => q.evidence[0] === career));
+      assert.ok(!/200%|90%|80%|Docker|Redis|Kafka/.test(JSON.stringify(body)));
+      return Response.json({
+        questions: body.questions.map((q: { id: string }) => ({
+          id: q.id,
+          question: '주문 API에서 직접 맡은 부분은 무엇인가요?',
+          followups: ['결과는 어떻게 확인하셨나요?'],
+          guide: ['담당 업무를 설명하세요.'],
+        })),
+      });
+    },
+  });
+  assert.equal(result.generation, 'ai');
+  assert.ok(
+    result.questions.every((q) => q.kind === 'personal' && q.sources[0].excerpt === career),
+  );
+});
+
+test('career sections continue across pages, stop at other headings and reset per document', () => {
+  const { p, r, a } = setup();
+  const work = 'Developed payment APIs and improved response time.';
+  const continuation = 'Implemented billing automation and reduced manual work.';
+  r.documents[0].pages = [
+    { number: 1, text: `WORK EXPERIENCE\n${work}` },
+    {
+      number: 2,
+      text: `${continuation}\nSKILLS: React, Java\nDeveloped a personal React application.`,
+    },
+  ];
+  r.documents.push({
+    ...r.documents[0],
+    id: 'portfolio',
+    filename: '포트폴리오.txt',
+    pages: [{ number: 1, text: 'Designed a personal project and improved its performance.' }],
+  });
+  const topics = buildInterviewInput(p, r, a).experienceTopics!;
+  assert.equal(topics.length, 2);
+  assert.deepEqual(new Set(topics.map((t) => t.sources[0].excerpt)), new Set([work, continuation]));
+  assert.equal(topics.find((t) => t.sources[0].excerpt === continuation)?.sources[0].page, 2);
+});
+
+test('inline career headings and employer project descriptions work without including side projects', () => {
+  const { p, r, a } = setup();
+  const work = '주문 서비스를 개발하고 배포 자동화를 구현했습니다.';
+  r.documents[0].pages = [
+    {
+      number: 1,
+      text: `경력: 4년\n프로젝트: 주문 서비스\n${work}\n개인 프로젝트: 실습\n개인용 알림 서비스를 개발했습니다.`,
+    },
+  ];
+  assert.deepEqual(
+    buildInterviewInput(p, r, a).experienceTopics?.map((t) => t.sources[0].excerpt),
+    [work],
+  );
+  r.documents[0].pages = [{ number: 1, text: `[경력 사항]: ${work}` }];
+  assert.deepEqual(
+    buildInterviewInput(p, r, a).experienceTopics?.map((t) => t.sources[0].excerpt),
+    [work],
+  );
+});
+
+test('an unreadable intervening page cannot leak later non-career content into career questions', () => {
+  const { p, r, a } = setup();
+  r.documents[0].pages = [
+    { number: 1, text: '경력\nJava API를 구현하여 처리 시간을 개선했습니다.' },
+    { number: 2, text: '' },
+    { number: 3, text: '개인 앱을 개발하고 화면을 설계했습니다.' },
+  ];
+  r.documents[0].unreadablePages = [2];
+  const topics = buildInterviewInput(p, r, a).experienceTopics!;
+  assert.equal(topics.length, 1);
+  assert.equal(topics[0].sources[0].page, 1);
+});
+
+test('previous packets remain stored but are not reused as career-only questions', () => {
+  const { db, packet, p, r, a } = setup();
+  const old = { ...packet, key: `interview-v1:${r.id}:${a.id}` };
+  old.questions[0].note = '이전 질문 메모';
+  p.interviews = [old];
+  const saved = saveInterview(db, p.id, packet, 0);
+  assert.equal(saved.projects[0].interviews?.length, 2);
+  assert.equal(
+    saved.projects[0].interviews?.find((q) => q.key === old.key)?.questions[0].note,
+    '이전 질문 메모',
+  );
+  assert.notEqual(old.key, packetKey(r.id, a.id));
 });
 
 test('unverified, cross-applicant and fabricated source excerpts never become question citations', () => {
@@ -251,14 +373,10 @@ test('unverified, cross-applicant and fabricated source excerpts never become qu
   assert.equal(buildInterviewInput(p, r, a).topics[0].evidence, 'missing');
 });
 
-test('common questions remain identical across candidates with different evidence', () => {
-  const { p, r, a, input } = setup();
-  const other = structuredClone(a);
-  other.results = [];
-  other.id = 'other';
-  const common = (i: typeof input) =>
-    templateQuestions(i).questions.filter((q) => q.kind === 'common');
-  assert.deepEqual(common(input), common(buildInterviewInput(p, r, other)));
+test('questions are empty when the applicant has no career section even if JD matches', () => {
+  const { p, r, a } = setup();
+  r.documents[0].pages[0].text = 'Java API를 구현하여 처리 시간을 개선했습니다.';
+  assert.deepEqual(templateQuestions(buildInterviewInput(p, r, a)).questions, []);
 });
 
 test('generation input excludes identity, internal scores, weights and saved private notes', () => {
@@ -328,7 +446,7 @@ test('no credentials makes no outbound call and labels templates honestly', asyn
   assert.match(result.notice, /기본 질문/);
 });
 
-test('provider uses validated JSON; keeps common questions and source metadata immutable', async () => {
+test('provider uses only career evidence and keeps source metadata immutable', async () => {
   const { input } = setup();
   const base = templateQuestions(input);
   let requestBody: Record<string, unknown> = {};
@@ -436,7 +554,7 @@ test('API validates input, origins and payload size; response is not cached', as
   const response = await POST(make(JSON.stringify(input)));
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('cache-control'), 'no-store');
-  assert.equal((await response.json()).questions.length, 7);
+  assert.equal((await response.json()).questions.length, 4);
   assert.equal(interviewInputSchema.safeParse({ ...input, topics: [] }).success, false);
 });
 
@@ -538,7 +656,7 @@ test('new questions remain a separate draft until reviewed and saved', () => {
   assert.equal(JSON.stringify(db), before);
   assert.equal(candidate.promptUsed, review.prompt);
   const saved = saveInterview(db, p.id, candidate, restored.baseVersion);
-  assert.equal(saved.projects[0].interviews?.[0].questions.length, 7);
+  assert.equal(saved.projects[0].interviews?.[0].questions.length, 4);
 });
 
 test('review identifies preserved edits and exclusions and applies only allowed changes', () => {

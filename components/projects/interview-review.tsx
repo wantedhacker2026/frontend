@@ -21,7 +21,6 @@ export function InterviewReviewDialog({
   onApply,
   onDiscard,
   disabled = false,
-  previewOnly = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -32,7 +31,6 @@ export function InterviewReviewDialog({
   onApply: () => void;
   onDiscard: () => void;
   disabled?: boolean;
-  previewOnly?: boolean;
 }) {
   const changed = result.questions.filter((q) =>
     ['new', 'changed'].includes(reviewQuestionStatus(q, previous)),
@@ -147,8 +145,8 @@ export function InterviewReviewDialog({
         <Button type="button" variant="outline" onClick={onDiscard}>
           취소 · 기존 질문 유지
         </Button>
-        <Button type="button" disabled={disabled} onClick={onApply}>
-          {previewOnly ? '확인 후 미리보기에 적용' : '확인 후 질문지에 적용'}
+        <Button type="button" disabled={disabled || !result.questions.length} onClick={onApply}>
+          확인 후 질문지에 적용
         </Button>
       </div>
     </Dialog>

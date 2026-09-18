@@ -104,8 +104,8 @@ async function main() {
       });
       assert.equal(response.status, 200, `${scenario.key}/${role}: interview endpoint`);
       const interview = generationSchema.parse(await response.json());
-      assert.equal(interview.questions.length, 7);
-      assert.equal(interview.questions.filter((q) => q.kind === 'common').length, 3);
+      assert.equal(interview.questions.length, 4);
+      assert.equal(interview.questions.filter((q) => q.kind === 'common').length, 0);
       assert.equal(interview.questions.filter((q) => q.kind === 'personal').length, 4);
       for (const question of interview.questions) {
         assert.ok(
@@ -121,7 +121,7 @@ async function main() {
           templateQuestions(input).questions.filter((q) => q.kind === 'common'),
         );
       console.log(
-        `PASS interview ${scenario.key}/${role}: 3 common + 4 personal, ${interview.generation}`,
+        `PASS interview ${scenario.key}/${role}: 4 career-based personal, ${interview.generation}`,
       );
     }
     const rows = analysis.results.map((result, i) => ({

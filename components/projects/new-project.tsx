@@ -27,7 +27,6 @@ import { EmptyState } from '@/components/ui/states';
 import { DocumentUpload } from './document-upload';
 import { InterviewPrompt } from './interview-prompt';
 import { projectLoginPath } from '@/lib/auth/navigation';
-import { JDInterviewPreview } from './interview';
 import { JDImport } from './jd-import';
 import { postingText } from '@/lib/job-postings/types';
 const draftSchema = z.object({
@@ -556,7 +555,6 @@ function ProjectForm({
             onChange={(interviewPrompt) => update({ interviewPrompt })}
           />
         </section>
-        {actor?.role === 'applicant' && <JDInterviewPreview draft={draft} />}
         <section className="project-form-section">
           <div className="project-section-title">
             <span>02</span>
