@@ -93,9 +93,18 @@ export const jdSchema = z.object({
   reference: z.string(),
   text: z.string().max(30000),
   imageName: z.string().optional(),
+  imported: z
+    .object({
+      sourceUrl: z.string().url(),
+      fetchedAt: z.string(),
+      method: z.enum(['structured-data', 'html', 'rendered']),
+      originalText: z.string().max(30000),
+    })
+    .optional(),
 });
 export type ProjectJD = z.infer<typeof jdSchema>;
 export const projectSchema = z.object({
+  interviewPrompt: z.string().max(2000).optional(),
   interviews: z.array(packetSchema).optional(),
   jobProfile: jobProfileIdSchema.optional(),
   profileCatalogVersion: z.string().optional(),
@@ -110,6 +119,7 @@ export const projectSchema = z.object({
 });
 export type AnalysisProject = z.infer<typeof projectSchema>;
 export interface ProjectDraft {
+  interviewPrompt?: string;
   jobProfile?: z.infer<typeof jobProfileIdSchema>;
   profileCatalogVersion?: string;
   id: string;

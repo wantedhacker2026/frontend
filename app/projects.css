@@ -1533,3 +1533,196 @@
     margin-left: 0;
   }
 }
+
+/* Newly generated questions stay separate until explicitly accepted. */
+.interview-review-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 20px 0;
+  padding: 18px;
+  border: 1px solid #abbbe9;
+  border-radius: 12px;
+  background: #edf2ff;
+}
+.interview-review-banner p,
+.interview-review-summary p {
+  margin: 8px 0;
+  line-height: 1.7;
+}
+.interview-review-summary {
+  padding: 16px;
+  border-radius: 10px;
+  background: #f2f5fb;
+  margin-bottom: 20px;
+  overflow-wrap: anywhere;
+}
+.interview-review-list {
+  display: grid;
+  gap: 20px;
+}
+.interview-review-question {
+  padding: 18px;
+  border: 1px solid #dce2ee;
+  border-radius: 12px;
+  overflow-wrap: anywhere;
+}
+.interview-review-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.interview-review-heading h3 {
+  font-weight: 700;
+}
+.interview-review-heading span {
+  color: #3d5192;
+  font-size: 12px;
+  background: #edf2ff;
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+.interview-review-comparison {
+  display: grid;
+  gap: 12px;
+}
+.interview-review-comparison.has-previous {
+  grid-template-columns: 1fr 1fr;
+}
+.interview-review-comparison section {
+  min-width: 0;
+  padding: 14px;
+  background: #f8f9fb;
+  border-radius: 8px;
+}
+.interview-review-comparison h4 {
+  font-size: 13px;
+  color: #596176;
+  margin-bottom: 8px;
+}
+.interview-review-comparison p {
+  font-weight: 600;
+  margin-bottom: 12px;
+  line-height: 1.8;
+}
+.interview-review-comparison strong {
+  display: block;
+  font-size: 13px;
+  margin-top: 12px;
+}
+.interview-review-comparison ul {
+  list-style: disc;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.interview-review-question details {
+  margin-top: 14px;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.interview-review-question blockquote {
+  margin: 8px 0;
+  padding-left: 12px;
+  border-left: 3px solid #cdd6ed;
+}
+.interview-review-preserved {
+  margin-top: 12px;
+  color: #765929;
+  font-size: 13px;
+}
+.interview-review-footer {
+  position: sticky;
+  bottom: -30px;
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 24px -30px -30px;
+  padding: 18px 30px;
+  border-top: 1px solid #dce2ee;
+  background: #fff;
+}
+@media (max-width: 640px) {
+  .interview-review-comparison.has-previous {
+    grid-template-columns: 1fr;
+  }
+  .interview-review-banner {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .interview-review-footer {
+    position: static;
+    margin: 20px 0 0;
+    padding: 16px 0 0;
+  }
+}
+.jd-import {
+  margin: 12px 0;
+}
+.jd-import-review {
+  display: grid;
+  gap: 16px;
+}
+.jd-import-notices {
+  padding-left: 20px;
+  font-size: 14px;
+  color: var(--muted-foreground);
+}
+.jd-import-notices li + li {
+  margin-top: 6px;
+}
+.jd-import-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.jd-import-error {
+  color: #b42318;
+  margin-top: 10px;
+}
+.jd-import-review a {
+  text-decoration: underline;
+}
+.project-auth-role {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 24px 0;
+}
+.project-auth-role button {
+  display: grid;
+  gap: 8px;
+  text-align: left;
+  padding: 20px;
+  border: 1px solid #d4d9e2;
+  border-radius: 12px;
+  background: white;
+}
+.project-auth-role button[aria-pressed='true'] {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+.project-auth-role span {
+  font-size: 14px;
+  color: #536174;
+}
+.project-email-login {
+  display: grid;
+  gap: 16px;
+  max-width: 520px;
+  padding: 24px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+}
+@media (max-width: 480px) {
+  .project-auth-role {
+    grid-template-columns: 1fr;
+  }
+  .project-email-login {
+    padding: 18px;
+  }
+}

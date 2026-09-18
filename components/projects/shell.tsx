@@ -5,6 +5,7 @@ import { useState, type ReactNode } from 'react';
 import { FolderPlus, Home, LogOut, Menu, X, Layers2, ArrowUpRight } from 'lucide-react';
 import { useProjects } from '@/lib/projects/store';
 import { projectRoute } from '@/lib/projects/domain';
+import { projectLoginPath } from '@/lib/auth/navigation';
 import { Skeleton } from '@/components/ui/states';
 export function ProjectShell({ children }: { children: ReactNode }) {
   const { actor, projects, ready, error, logout } = useProjects();
@@ -45,7 +46,7 @@ export function ProjectShell({ children }: { children: ReactNode }) {
             <Home size={18} />홈
           </Link>
           <Link
-            href="/new-project"
+            href={actor ? '/new-project' : projectLoginPath()}
             onClick={() => setMobile(false)}
             className={path === '/new-project' ? 'active' : ''}
           >
@@ -79,7 +80,7 @@ export function ProjectShell({ children }: { children: ReactNode }) {
               <ArrowUpRight size={14} />
             </Link>
           )}
-          <span className="project-demo-label">FRONTEND DEMO</span>
+          <span className="project-demo-label">브라우저에 저장</span>
           <p>
             파일의 텍스트와 분석 기록은
             <br />이 브라우저에만 저장됩니다.
@@ -87,11 +88,11 @@ export function ProjectShell({ children }: { children: ReactNode }) {
           {actor ? (
             <>
               <strong>{actor.name}</strong>
-              <small>{actor.role === 'recruiter' ? '채용 담당자' : '구직자'} · 데모 로그인</small>
+              <small>{actor.role === 'recruiter' ? '채용 담당자' : '구직자'} · 이메일 인증</small>
               <button
-                onClick={() => {
+                onClick={async () => {
                   try {
-                    logout();
+                    await logout();
                     router.push('/home');
                   } catch (e) {
                     setLocalError((e as Error).message);
@@ -136,7 +137,7 @@ export function ProjectShell({ children }: { children: ReactNode }) {
             </span>
           </div>
           {!actor && <Link href="/login">로그인 / 회원가입</Link>}
-          {actor && <span className="project-demo-label">{actor.provider} · DEMO</span>}
+          {actor && <span className="project-demo-label">{actor.provider}</span>}
         </header>
         <main className="project-content">
           {error || localError ? (

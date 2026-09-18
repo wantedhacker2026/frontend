@@ -12,6 +12,7 @@ import { ServerKeywordEvaluator } from '@/lib/evaluation/server-keyword-evaluato
 import { MAX_ANALYSIS_CRITERIA } from '@/lib/evaluation/limits';
 import type { Application, EvaluationCriterion, Job } from '@/types';
 import { evidenceLines } from './evidence';
+import { sectionHeading, type SectionKey } from '@/lib/job-postings/types';
 import {
   projectDBSchema,
   type AnalysisProject,
@@ -34,7 +35,29 @@ export function ownedProjects(projects: AnalysisProject[], actor: ProjectActor |
 export function parseProjects(raw: string): ProjectDB {
   return projectDBSchema.parse(JSON.parse(raw));
 }
-export function deriveCriteria(text: string, jobProfile?: JobProfileId): ProjectCriterion[] {
+export function deriveCriteria(
+  text: string,
+  jobProfile?: JobProfileId,
+  sectionAware = false,
+): ProjectCriterion[] {
+  if (sectionAware) {
+    const criteria = deriveCriteria(text, jobProfile);
+    let section: SectionKey = 'other';
+    const requiredLines = text.split('\n').filter((line) => {
+      const heading = sectionHeading(line);
+      if (heading) {
+        section = heading;
+        return false;
+      }
+      return section === 'requirements';
+    });
+    return criteria.map((criterion) => ({
+      ...criterion,
+      required: requiredLines.some((line) =>
+        criterion.keywords.some((keyword) => containsKeyword(line, keyword)),
+      ),
+    }));
+  }
   if (jobProfile) return deriveJobCriteria(text, jobProfile);
   const base = generateCriteria('project', text)
     .filter((c) => c.keywords.some((k) => containsKeyword(text, k)))
@@ -277,6 +300,7 @@ export async function processDraft(
   };
   await new Promise((resolve) => setTimeout(resolve, 150));
   return {
+    interviewPrompt: draft.interviewPrompt ?? '',
     id: draft.id,
     title: draft.title.trim(),
     ownerId: actor.id,
@@ -308,6 +332,7 @@ export function saveProject(
 export function revisionDraft(project: AnalysisProject): ProjectDraft {
   const revision = project.revisions.at(-1)!;
   return structuredClone({
+    interviewPrompt: project.interviewPrompt ?? '',
     id: project.id,
     title: project.title,
     jd: project.jd,

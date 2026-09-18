@@ -1,6 +1,9 @@
 import { interviewInputSchema } from '@/lib/interview/types';
 import { generateInterview } from '@/lib/interview/generator';
 
+import { readSession } from '@/lib/auth/session';
+import { accessToken } from '@/lib/auth/backend';
+
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 const MAX_BODY = 180_000;
@@ -24,6 +27,13 @@ export async function POST(request: Request) {
   }
   if (!allowedOrigin)
     return Response.json({ error: '허용되지 않은 요청입니다.' }, { status: 403, headers });
+  const actor = readSession(request);
+  const token = accessToken(request);
+  if (!actor || !token)
+    return Response.json(
+      { error: '로그인 후 면접 질문을 생성해 주세요.' },
+      { status: 401, headers },
+    );
   if (!request.headers.get('content-type')?.includes('application/json'))
     return Response.json({ error: 'JSON 입력이 필요합니다.' }, { status: 415, headers });
   if (Date.now() - windowStart > 60_000) {
@@ -58,9 +68,12 @@ export async function POST(request: Request) {
       new Set(parsed.data.topics.map((t) => t.id)).size !== parsed.data.topics.length
     )
       return Response.json({ error: '질문 생성 기준을 확인해 주세요.' }, { status: 400, headers });
+    if (parsed.data.role !== actor.role)
+      return Response.json({ error: '로그인 역할을 확인해 주세요.' }, { status: 403, headers });
     const result = await generateInterview(parsed.data, {
-      apiKey: process.env.INTERVIEW_AI_ENABLED === 'true' ? process.env.OPENAI_API_KEY : undefined,
-      model: process.env.OPENAI_INTERVIEW_MODEL,
+      serverUrl: process.env.WANTEDHACKER_SERVER_URL,
+      proxySecret: process.env.INTERVIEW_PROXY_SECRET,
+      accessToken: token,
     });
     return Response.json(result, { headers });
   } catch {

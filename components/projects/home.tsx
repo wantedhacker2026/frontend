@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { FolderPlus, ArrowUpRight, Files, ChevronRight } from 'lucide-react';
 import { useProjects } from '@/lib/projects/store';
 import { projectRoute } from '@/lib/projects/domain';
+import { projectLoginPath } from '@/lib/auth/navigation';
 import { Button } from '@/components/ui/button';
 export function ProjectHome() {
   const { actor, projects } = useProjects();
@@ -26,7 +27,7 @@ export function ProjectHome() {
         </div>
         {actor && (
           <Button asChild>
-            <Link href="/new-project">
+            <Link href={actor ? '/new-project' : projectLoginPath()}>
               <FolderPlus size={17} />새 프로젝트 생성
             </Link>
           </Button>
@@ -34,7 +35,11 @@ export function ProjectHome() {
       </div>
       {!actor || !projects.length ? (
         <div className="project-empty">
-          <Link href="/new-project" className="project-empty-icon" aria-label="새 프로젝트 등록">
+          <Link
+            href={actor ? '/new-project' : projectLoginPath()}
+            className="project-empty-icon"
+            aria-label="새 프로젝트 등록"
+          >
             <Files size={50} />
             <span>+</span>
           </Link>
@@ -45,7 +50,7 @@ export function ProjectHome() {
             구직자는 내 서류의 근거와 개선 방향을 확인합니다.
           </p>
           <Button asChild>
-            <Link href="/new-project">
+            <Link href={actor ? '/new-project' : projectLoginPath()}>
               새 프로젝트 만들기
               <ArrowUpRight size={16} />
             </Link>

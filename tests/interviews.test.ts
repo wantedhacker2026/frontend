@@ -9,10 +9,25 @@ import {
   templateQuestions,
   interviewText,
 } from '../lib/interview/domain';
+import {
+  applyInterviewReview,
+  interviewReviewSchema,
+  reviewQuestionStatus,
+  reviewStorageKey,
+} from '../lib/interview/review';
 import { generateInterview } from '../lib/interview/generator';
 import { interviewInputSchema } from '../lib/interview/types';
 import { parseProjects, saveProject } from '../lib/projects/domain';
 import type { AnalysisProject, ProjectDB } from '../lib/projects/types';
+import { authFixture } from './auth-fixture';
+const testSecret = 'test-proxy-secret-at-least-thirty-two-characters';
+process.env.INTERVIEW_PROXY_SECRET = testSecret;
+const { cookie } = authFixture({
+  id: 'owner',
+  name: '테스트',
+  role: 'recruiter',
+  provider: 'test',
+});
 import { POST } from '../app/api/interviews/route';
 
 function fixture(role: 'applicant' | 'recruiter' = 'recruiter'): AnalysisProject {
@@ -137,11 +152,93 @@ test('JD-only gives six questions; personalized gives three common and four evid
   const result = templateQuestions(input);
   assert.equal(result.questions.length, 7);
   assert.equal(result.questions.filter((q) => q.kind === 'common').length, 3);
-  assert.equal(result.questions.find((q) => q.kind === 'personal')?.topicId, 'db');
-  assert.ok(result.questions.some((q) => q.reason.includes('읽지 못해')));
+  assert.match(result.questions.find((q) => q.kind === 'personal')!.topicId, /^experience-/);
+  assert.ok(
+    result.questions
+      .filter((q) => q.kind === 'personal')
+      .every((q) => q.topic.includes('Java API를 구현') && q.sources.length > 0),
+  );
+  assert.ok(!result.questions.some((q) => q.kind === 'personal' && q.topicId === 'db'));
   const source = result.questions.flatMap((q) => q.sources)[0];
   assert.equal(source.page, 2);
   assert.equal(source.excerpt, 'Java API를 구현하여 처리 시간을 개선했습니다.');
+});
+
+test('experience topics come from applicant text even without JD keyword matches, across roles', () => {
+  const { p, r, a } = setup();
+  const experiences = [
+    'Redis 캐시를 구현하여 조회 응답 시간을 30% 개선했습니다.',
+    'React 화면의 접근성을 개선하고 키보드 탐색을 구현했습니다.',
+    '금융 고객과 요구사항을 조율하고 프로젝트 일정을 관리했습니다.',
+    'Figma 프로토타입을 제작하여 사용자 테스트를 수행했습니다.',
+  ];
+  r.documents[0].pages = [{ number: 1, text: experiences.join('\n') }];
+  a.results = [];
+  const input = buildInterviewInput(p, r, a);
+  assert.equal(input.experienceTopics?.length, 4);
+  const personal = templateQuestions(input).questions.filter((q) => q.kind === 'personal');
+  assert.equal(new Set(personal.map((q) => q.topicId)).size, 4);
+  for (const q of personal) {
+    assert.ok(experiences.includes(q.sources[0].excerpt));
+    // Context stays on the question card and in evidence, rather than a repeated long quotation.
+    assert.ok(!q.question.includes(q.sources[0].excerpt));
+    assert.ok(q.question.length <= 80);
+    assert.equal(q.question.split('?').length - 1, 1);
+    assert.equal(q.jdEvidence, q.topic.includes('요구사항') ? '고객 요구사항 조율 경험' : '');
+  }
+});
+
+test('experience extraction deduplicates evidence and excludes other applicants, unreadable pages and identity', () => {
+  const { p, r, a } = setup();
+  const original = r.documents[0].pages[0].text;
+  r.documents[0].pages = [
+    {
+      number: 1,
+      text: [
+        original,
+        original,
+        '이름: 홍길동 개발자',
+        '사용자의 문제를 안정적인 서비스로 해결하는 백엔드 개발자입니다.',
+        '개발자 연락처: dev@example.com',
+        '종교 단체에서 프로젝트를 관리했습니다.',
+        'Kubernetes 운영 경험이 없습니다.',
+        'Kafka 운영 경험은 없습니다.',
+        '서비스를 직접 배포해 보지 않았습니다.',
+        'I have never managed a Kafka cluster.',
+        'Redis를 개발에 도입하고 싶습니다.',
+        'Java, Redis, Kafka, Docker',
+      ].join('\n'),
+    },
+    { number: 2, text: '판독 불가 페이지에서 서버를 설계했습니다.' },
+  ];
+  r.documents[0].unreadablePages = [2];
+  r.documents.push({
+    ...r.documents[0],
+    id: 'other',
+    applicantId: 'other-person',
+    pages: [{ number: 1, text: '다른 지원자가 대형 서비스를 구축했습니다.' }],
+  });
+  const input = buildInterviewInput(p, r, a);
+  assert.equal(input.experienceTopics?.length, 1);
+  assert.equal(input.experienceTopics![0].sources[0].excerpt, original);
+  assert.equal(input.experienceTopics![0].sources[0].page, 1);
+  assert.deepEqual(input.experienceTopics, buildInterviewInput(p, r, a).experienceTopics);
+});
+
+test('without written experiences no personal questions are invented and AI is not called', async () => {
+  const { p, r, a } = setup();
+  r.documents[0].pages = [{ number: 1, text: '기술 스택: Java, Redis, Kafka' }];
+  const input = buildInterviewInput(p, r, a);
+  const result = await generateInterview(input, {
+    serverUrl: 'http://server:8080',
+    proxySecret: 'test',
+    fetch: async () => {
+      throw new Error('must not call');
+    },
+  });
+  assert.equal(result.questions.length, 3);
+  assert.ok(result.questions.every((q) => q.kind === 'common'));
+  assert.match(result.notice, /수행 경험을 추출하지 못해/);
 });
 
 test('unverified, cross-applicant and fabricated source excerpts never become question citations', () => {
@@ -236,37 +333,35 @@ test('provider uses validated JSON; keeps common questions and source metadata i
   const base = templateQuestions(input);
   let requestBody: Record<string, unknown> = {};
   const result = await generateInterview(input, {
-    apiKey: 'fake',
-    model: 'test-model',
+    serverUrl: 'http://server:8080',
+    proxySecret: 'fake',
     fetch: async (_url, options) => {
       requestBody = JSON.parse(options!.body as string);
+      const seeds = requestBody.questions as { topic: string; evidence: string[] }[];
+      assert.ok(
+        seeds.every(
+          (q) =>
+            q.topic.includes('Java API를 구현') &&
+            q.evidence.includes('Java API를 구현하여 처리 시간을 개선했습니다.'),
+        ),
+      );
+      assert.equal(_url, 'http://server:8080/api/interviews');
+      assert.equal(new Headers(options?.headers).get('X-Interview-Proxy-Secret'), 'fake');
       return Response.json({
-        status: 'completed',
-        output: [
-          {
-            type: 'message',
-            content: [
-              {
-                type: 'output_text',
-                text: JSON.stringify({
-                  questions: base.questions
-                    .filter((q) => q.kind === 'personal')
-                    .map((q) => ({
-                      id: q.id,
-                      question: `${q.topic}에 대한 판단 이유를 설명해 주세요.`,
-                      followups: ['대안은 무엇이었나요?'],
-                      guide: ['사례를 정리하세요.'],
-                      sources: [{ excerpt: 'invented' }],
-                    })),
-                }),
-              },
-            ],
-          },
-        ],
+        questions: base.questions
+          .filter((q) => q.kind === 'personal')
+          .map((q) => ({
+            id: q.id,
+            question: `${q.topic}에 대한 판단 이유를 설명해 주세요.`,
+            followups: ['대안은 무엇이었나요?'],
+            guide: ['사례를 정리하세요.'],
+            sources: [{ excerpt: 'invented' }],
+          })),
       });
     },
   });
-  assert.equal(requestBody.store, false);
+  assert.equal(requestBody.prompt, input.prompt);
+  assert.ok(!JSON.stringify(requestBody).includes('apiKey'));
   assert.equal(result.generation, 'ai');
   assert.deepEqual(
     result.questions.filter((q) => q.kind === 'common'),
@@ -304,8 +399,8 @@ test('provider refusal, failure, incomplete responses and invalid IDs fall back 
     },
   ]) {
     const result = await generateInterview(input, {
-      apiKey: 'secret',
-      model: 'test',
+      serverUrl: 'http://server:8080',
+      proxySecret: 'secret',
       fetch: async () => Response.json(payload),
     });
     assert.equal(result.generation, 'template');
@@ -313,8 +408,8 @@ test('provider refusal, failure, incomplete responses and invalid IDs fall back 
     assert.ok(!result.notice.includes('secret'));
   }
   const failed = await generateInterview(input, {
-    apiKey: 'secret',
-    model: 'test',
+    serverUrl: 'http://server:8080',
+    proxySecret: 'secret',
     fetch: async () => {
       throw new Error('secret');
     },
@@ -327,7 +422,7 @@ test('API validates input, origins and payload size; response is not cached', as
   const make = (body: string, origin = 'http://localhost:3000') =>
     new Request('http://localhost:3000/api/interviews', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', origin },
+      headers: { 'content-type': 'application/json', origin, cookie },
       body,
     });
   assert.equal((await POST(make(JSON.stringify(input), 'https://other.example'))).status, 403);
@@ -391,10 +486,144 @@ test('Docker standalone accepts same browser host while rejecting a different or
   const make = (origin: string) =>
     new Request('http://0.0.0.0:3000/api/interviews', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', host: 'localhost:3000', origin },
+      headers: { 'content-type': 'application/json', host: 'localhost:3000', origin, cookie },
       body: JSON.stringify(input),
     });
   assert.equal((await POST(make('http://localhost:3000'))).status, 200);
   assert.equal((await POST(make('http://evil.example'))).status, 403);
   assert.equal((await POST(make('null'))).status, 403);
+});
+
+test('anonymous generation and mismatched login roles are rejected', async () => {
+  const { input } = setup();
+  const make = (headers: Record<string, string>, role = input.role) =>
+    new Request('http://localhost:3000/api/interviews', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: 'http://localhost:3000', ...headers },
+      body: JSON.stringify({ ...input, role }),
+    });
+  assert.equal((await POST(make({}))).status, 401);
+  assert.equal((await POST(make({ cookie }, 'applicant'))).status, 403);
+});
+
+test('project prompt persists and enters generation without scores or private notes', () => {
+  const { p, r, a, db } = setup();
+  p.interviewPrompt = '트레이드오프와 장애 대응을 중심으로 질문해 주세요.';
+  const restored = parseProjects(JSON.stringify({ ...db, projects: [p] }));
+  const input = buildInterviewInput(restored.projects[0], r, a);
+  assert.equal(input.prompt, p.interviewPrompt);
+  assert.equal(newPacket(p, r, a, templateQuestions(input)).promptUsed, '');
+  assert.equal(
+    newPacket(p, r, a, { ...templateQuestions(input), generation: 'ai' }).promptUsed,
+    p.interviewPrompt,
+  );
+  assert.equal(
+    interviewInputSchema.safeParse({ ...input, prompt: 'x'.repeat(2001) }).success,
+    false,
+  );
+});
+
+test('new questions remain a separate draft until reviewed and saved', () => {
+  const { p, r, a, db, input } = setup();
+  const before = JSON.stringify(db);
+  const review = interviewReviewSchema.parse({
+    key: packetKey(r.id, a.id),
+    baseVersion: 0,
+    createdAt: new Date().toISOString(),
+    prompt: '설계 판단을 확인해 주세요.',
+    result: { ...templateQuestions(input), generation: 'ai' },
+  });
+  const restored = interviewReviewSchema.parse(JSON.parse(JSON.stringify(review)));
+  const candidate = applyInterviewReview(p, r, a, restored);
+  assert.equal(JSON.stringify(db), before);
+  assert.equal(candidate.promptUsed, review.prompt);
+  const saved = saveInterview(db, p.id, candidate, restored.baseVersion);
+  assert.equal(saved.projects[0].interviews?.[0].questions.length, 7);
+});
+
+test('review identifies preserved edits and exclusions and applies only allowed changes', () => {
+  const { p, r, a, packet, input } = setup();
+  const deleted = packet.questions.pop()!;
+  packet.questions[0].edited = true;
+  packet.questions[0].question = '직접 고친 질문';
+  packet.questions[0].note = '보존할 메모';
+  packet.questions.reverse();
+  const result = templateQuestions(input);
+  result.questions = result.questions.map((q) => ({ ...q, question: '새 질문 ' + q.id }));
+  assert.equal(reviewQuestionStatus(result.questions[0], packet.questions), 'kept');
+  assert.equal(
+    reviewQuestionStatus(
+      result.questions.find((q) => q.id === deleted.id)!,
+      packet.questions,
+    ),
+    'excluded',
+  );
+  assert.equal(reviewQuestionStatus(result.questions[1], packet.questions), 'changed');
+  assert.equal(reviewQuestionStatus(result.questions[1]), 'new');
+  const review = {
+    key: packet.key,
+    baseVersion: packet.version,
+    createdAt: new Date().toISOString(),
+    prompt: '',
+    result,
+  };
+  const next = applyInterviewReview(p, r, a, review, packet);
+  assert.deepEqual(
+    next.questions.map((q) => q.id),
+    packet.questions.map((q) => q.id),
+  );
+  assert.deepEqual(
+    next.questions.find((q) => q.edited),
+    packet.questions.find((q) => q.edited),
+  );
+  assert.ok(next.questions.some((q) => q.question.startsWith('새 질문')));
+  assert.ok(!next.questions.some((q) => q.id === deleted.id));
+});
+
+test('stale or different-analysis reviews cannot overwrite newer notes or finalized packets', () => {
+  const { p, r, a, packet, input } = setup();
+  const review = {
+    key: packet.key,
+    baseVersion: packet.version,
+    createdAt: new Date().toISOString(),
+    prompt: '',
+    result: templateQuestions(input),
+  };
+  assert.throws(
+    () => applyInterviewReview(p, r, a, review, { ...packet, version: packet.version + 1 }),
+    /변경/,
+  );
+  assert.throws(
+    () => applyInterviewReview(p, r, a, review, { ...packet, stage: 'ready' }),
+    /면접 준비/,
+  );
+  assert.throws(
+    () => applyInterviewReview(p, r, a, { ...review, key: 'other' }, packet),
+    /이 분석/,
+  );
+  assert.throws(() => applyInterviewReview(p, r, a, review), /변경/);
+  assert.notEqual(
+    reviewStorageKey(p, packet.key),
+    reviewStorageKey({ ...p, ownerId: 'other' }, packet.key),
+  );
+  assert.notEqual(
+    reviewStorageKey(p, packet.key),
+    reviewStorageKey({ ...p, id: 'other-project' }, packet.key),
+  );
+});
+
+test('fallback review stays labeled template and does not claim a custom prompt was used', () => {
+  const { p, r, a, input } = setup();
+  const result = templateQuestions(input);
+  const review = {
+    key: packetKey(r.id, a.id),
+    baseVersion: 0,
+    createdAt: new Date().toISOString(),
+    prompt: '추가 지침',
+    result,
+  };
+  const next = applyInterviewReview(p, r, a, review);
+  assert.equal(next.generation, 'template');
+  assert.equal(next.promptUsed, '');
+  assert.equal(reviewQuestionStatus(result.questions[0], result.questions), 'unchanged');
 });

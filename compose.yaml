@@ -27,8 +27,12 @@ services:
     build:
       context: ${SERVER_SOURCE_DIR:-../03_wantedhacker-server}
       target: runner
+    env_file:
+      - path: ${SERVER_SOURCE_DIR:-../03_wantedhacker-server}/.env
+        required: false
     environment:
       SPRING_PROFILES_ACTIVE: local
+      INTERVIEW_PROXY_SECRET: ${INTERVIEW_PROXY_SECRET:-}
       ES_URIS: http://elasticsearch:9200
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=65.0
     ports:
@@ -47,9 +51,9 @@ services:
       - '127.0.0.1:${WEB_PORT:-3000}:3000'
     environment:
       WANTEDHACKER_SERVER_URL: http://server:8080
-      INTERVIEW_AI_ENABLED: ${INTERVIEW_AI_ENABLED:-false}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_INTERVIEW_MODEL: ${OPENAI_INTERVIEW_MODEL:-}
+      INTERVIEW_PROXY_SECRET: ${INTERVIEW_PROXY_SECRET:-}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      JOB_IMPORT_RENDER_ENABLED: ${JOB_IMPORT_RENDER_ENABLED:-true}
     depends_on:
       server:
         condition: service_healthy
@@ -67,9 +71,9 @@ services:
       NEXT_TELEMETRY_DISABLED: '1'
       WATCHPACK_POLLING: 'true'
       WANTEDHACKER_SERVER_URL: http://server:8080
-      INTERVIEW_AI_ENABLED: ${INTERVIEW_AI_ENABLED:-false}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_INTERVIEW_MODEL: ${OPENAI_INTERVIEW_MODEL:-}
+      INTERVIEW_PROXY_SECRET: ${INTERVIEW_PROXY_SECRET:-}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      JOB_IMPORT_RENDER_ENABLED: ${JOB_IMPORT_RENDER_ENABLED:-true}
     depends_on:
       server:
         condition: service_healthy

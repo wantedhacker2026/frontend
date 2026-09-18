@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { useStore } from '@/lib/store';
+import { useProjects } from '@/lib/projects/store';
 import { Skeleton } from './ui/states';
 import { Button } from './ui/button';
 import { Dialog } from './ui/dialog';
@@ -58,10 +59,27 @@ export function Shell({
 }) {
   const path = usePathname();
   const { db, ready, error, dismissError, reset } = useStore();
+  const { actor, ready: authReady } = useProjects();
   const [mobile, setMobile] = useState(false);
   const [help, setHelp] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const recruiter = role === 'recruiter';
+  const privatePage = /^\/(resumes|applications|recruiter)(\/|$)/.test(path);
+  if (privatePage && !authReady) return <Skeleton />;
+  if (privatePage && (!actor || actor.role !== role))
+    return (
+      <main className="project-auth-existing">
+        <h1>{actor ? '이용 유형을 확인해 주세요.' : '로그인 후 이용해 주세요.'}</h1>
+        <p>
+          {actor
+            ? '현재 로그인한 이용 유형의 작업 공간에서 계속할 수 있습니다.'
+            : '이메일 인증 후 내 지원서와 채용 작업 공간을 사용할 수 있습니다.'}
+        </p>
+        <Button asChild>
+          <Link href={actor ? '/home' : '/login'}>{actor ? '내 홈으로' : '이메일로 로그인'}</Link>
+        </Button>
+      </main>
+    );
   return (
     <div className="app-shell framer-workspace">
       <aside className={`sidebar ${mobile ? 'sidebar-open' : ''}`}>
@@ -190,15 +208,15 @@ export function Shell({
             데모 이용 가이드
             <ArrowUpRight size={15} />
           </button>
-          <Link href={recruiter ? '/jobs' : '/recruiter/jobs'} className="role-switch">
-            {recruiter ? '지원자 화면으로 전환' : '채용담당자 화면으로 전환'}
+          <Link href={actor ? '/home' : '/login'} className="role-switch">
+            {actor ? '내 프로젝트 홈으로' : '이메일로 로그인'}
             <ArrowUpRight size={15} />
           </Link>
           <div className="sidebar-user">
             <span className="user-avatar">{recruiter ? '채' : '나'}</span>
             <div>
-              <strong>{recruiter ? '채용담당자' : '지원자'} 체험</strong>
-              <small>로그인 없이 둘러보세요</small>
+              <strong>{actor?.name ?? '공고 둘러보기'}</strong>
+              <small>{actor ? '이메일 인증' : '로그인 후 내 서류를 저장하세요'}</small>
             </div>
             <span className="online-dot" />
           </div>

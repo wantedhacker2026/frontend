@@ -42,7 +42,7 @@ export function ProjectResults({
     return (
       <EmptyState
         title="프로젝트에 접근할 수 없습니다"
-        description="로그인한 역할과 계정에 속한 프로젝트만 열 수 있습니다. 데모의 화면 접근 구분이며 실제 인증은 아닙니다."
+        description="이메일 인증한 계정과 현재 이용 유형에 속한 프로젝트만 열 수 있습니다. 프로젝트 데이터는 생성한 브라우저에 저장됩니다."
         href={actor ? '/home' : '/login'}
         label={actor ? '내 홈으로' : '로그인'}
       />

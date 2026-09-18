@@ -5,6 +5,7 @@ import { demoDraft } from '../lib/projects/demo';
 import { deriveCriteria, parseProjects, processDraft, revisionDraft } from '../lib/projects/domain';
 import type { ProjectActor } from '../lib/projects/types';
 import { POST } from '../app/api/analysis/keywords/route';
+import { authFixture } from './auth-fixture';
 
 const actor: ProjectActor = { id: 'reviewer', role: 'recruiter', name: '담당자', provider: '데모' };
 function draft() {
@@ -163,6 +164,7 @@ test('JD extraction includes broad architecture and server experience', () => {
 });
 
 test('proxy validates input, forwards only analysis data and handles server failure', async (t) => {
+  const { cookie } = authFixture();
   const oldUrl = process.env.WANTEDHACKER_SERVER_URL;
   process.env.WANTEDHACKER_SERVER_URL = 'http://127.0.0.1:18080';
   t.after(() => {
@@ -173,12 +175,13 @@ test('proxy validates input, forwards only analysis data and handles server fail
     new Request('http://localhost/api/analysis/keywords', {
       method: 'POST',
       body: JSON.stringify(body),
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', origin: 'http://localhost', cookie },
     });
   let calls = 0;
   t.mock.method(globalThis, 'fetch', async (url: string, init: RequestInit) => {
     calls++;
     assert.equal(url, 'http://127.0.0.1:18080/api/analysis/keywords');
+    assert.equal(new Headers(init.headers).get('authorization'), 'Bearer test-access');
     assert.equal(JSON.parse(String(init.body)).name, undefined);
     return Response.json(payload);
   });

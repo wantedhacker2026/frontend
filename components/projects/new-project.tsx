@@ -26,8 +26,13 @@ import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/states';
 import { DocumentUpload } from './document-upload';
+import { InterviewPrompt } from './interview-prompt';
+import { projectLoginPath } from '@/lib/auth/navigation';
 import { JDInterviewPreview } from './interview';
+import { JDImport } from './jd-import';
+import { postingText } from '@/lib/job-postings/types';
 const draftSchema = z.object({
+  interviewPrompt: z.string().max(2000).optional(),
   jobProfile: jobProfileIdSchema.optional(),
   profileCatalogVersion: z.string().optional(),
   id: z.string(),
@@ -38,10 +43,16 @@ const draftSchema = z.object({
   people: z.array(personSchema.extend({ name: z.string() })),
 });
 export function NewProject() {
-  const { actor, projects } = useProjects();
+  const { actor, projects, ready } = useProjects();
+  const router = useRouter();
   const query = useSearchParams();
+  const destination = `/new-project${query.size ? `?${query.toString()}` : ''}`;
+  useEffect(() => {
+    if (ready && !actor) router.replace(projectLoginPath(destination));
+  }, [ready, actor, router, destination]);
   const projectId = query.get('projectId');
   const project = projects.find((p) => p.id === projectId);
+  if (!ready || !actor) return <p role="status">로그인 상태를 확인하고 있습니다.</p>;
   if (projectId && !project)
     return (
       <EmptyState
@@ -140,7 +151,10 @@ function ProjectForm({
     setDirty(true);
   }
   function changeText(text: string) {
-    update({ jd: { ...draft.jd, text }, criteria: deriveCriteria(text, draft.jobProfile) });
+    update({
+      jd: { ...draft.jd, text },
+      criteria: deriveCriteria(text, draft.jobProfile, Boolean(draft.jd.imported)),
+    });
   }
   const selectedProfile = getJobProfile(draft.jobProfile);
   let validation = '';
@@ -252,7 +266,7 @@ function ProjectForm({
                 update({
                   jobProfile,
                   profileCatalogVersion: jobProfile ? JOB_PROFILE_CATALOG_VERSION : undefined,
-                  criteria: deriveCriteria(draft.jd.text, jobProfile),
+                  criteria: deriveCriteria(draft.jd.text, jobProfile, Boolean(draft.jd.imported)),
                 });
               }}
             >
@@ -329,10 +343,30 @@ function ProjectForm({
                   readOnly={Boolean(previous)}
                 />
               </label>
-              <p className="project-notice">
-                URL 자동 수집은 연동 전입니다. 아래에 공고 본문을 붙여넣으면 해당 텍스트를
-                분석합니다. 접근 제한된 공고는 JD 이미지를 선택하고 본문을 입력할 수 있어요.
-              </p>
+              {!previous && (
+                <JDImport
+                  key={draft.jd.reference}
+                  url={draft.jd.reference}
+                  hasText={Boolean(draft.jd.text)}
+                  onApply={(posting, originalText) => {
+                    const text = postingText(posting.sections);
+                    update({
+                      title: draft.title.trim() ? draft.title : posting.title,
+                      jd: {
+                        ...draft.jd,
+                        text,
+                        imported: {
+                          sourceUrl: posting.sourceUrl,
+                          fetchedAt: posting.fetchedAt,
+                          method: posting.method,
+                          originalText,
+                        },
+                      },
+                      criteria: deriveCriteria(text, draft.jobProfile, true),
+                    });
+                  }}
+                />
+              )}
             </>
           )}
           {draft.jd.mode === 'image' && (
@@ -532,6 +566,12 @@ function ProjectForm({
               </button>
             )}
           </details>
+        </section>
+        <section className="interview-panel">
+          <InterviewPrompt
+            value={draft.interviewPrompt ?? ''}
+            onChange={(interviewPrompt) => update({ interviewPrompt })}
+          />
         </section>
         {actor?.role === 'applicant' && <JDInterviewPreview draft={draft} />}
         <section className="project-form-section">

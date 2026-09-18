@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
+import { emailAuthFixture } from './email-auth-fixture';
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { deriveCriteria, processDraft } from '../lib/projects/domain';
 import { JOB_PROFILE_CATALOG_VERSION } from '../lib/evaluation/job-profiles';
 import { ServerKeywordEvaluator } from '../lib/evaluation/server-keyword-evaluator';
-import type { ProjectActor, ProjectDraft } from '../lib/projects/types';
+import type { ProjectDraft } from '../lib/projects/types';
 import { fitSummary, sortAnalyses } from '../lib/projects/fit';
 import { buildInterviewInput, templateQuestions } from '../lib/interview/domain';
 import { generationSchema } from '../lib/interview/types';
@@ -12,12 +13,6 @@ import { generationSchema } from '../lib/interview/types';
 // node --import tsx scripts/test-synthetic-resumes.ts http://127.0.0.1:3100
 const origin = process.argv[2] ?? 'http://127.0.0.1:3100';
 assert.ok(['127.0.0.1', 'localhost'].includes(new URL(origin).hostname), 'Local test only');
-const actor: ProjectActor = {
-  id: 'synthetic-recruiter',
-  name: '검증 담당자',
-  role: 'recruiter',
-  provider: '테스트',
-};
 const scenarios = [
   {
     key: 'backend',
@@ -42,6 +37,11 @@ const scenarios = [
   },
 ] as const;
 async function main() {
+  const sessions = {
+    recruiter: await emailAuthFixture(origin, 'recruiter'),
+    applicant: await emailAuthFixture(origin, 'applicant'),
+  };
+  const actor = sessions.recruiter.actor;
   const reports = [];
   for (const scenario of scenarios) {
     const read = (name: string) =>
@@ -79,15 +79,27 @@ async function main() {
       ],
     };
     const evaluator = new ServerKeywordEvaluator((url, init) =>
-      fetch(new URL(String(url), origin), init),
+      fetch(new URL(String(url), origin), {
+        ...init,
+        headers: {
+          ...Object.fromEntries(new Headers(init?.headers)),
+          Origin: new URL(origin).origin,
+          Cookie: sessions.recruiter.cookie,
+        },
+      }),
     );
     const project = await processDraft(draft, actor, undefined, () => {}, evaluator);
     const analysis = project.revisions[0].analyses[0];
     for (const role of ['applicant', 'recruiter'] as const) {
       const input = buildInterviewInput({ ...project, role }, project.revisions[0], analysis);
+      const cookie = sessions[role].cookie;
       const response = await fetch(new URL('/api/interviews', origin), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Origin: new URL(origin).origin },
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: new URL(origin).origin,
+          Cookie: cookie,
+        },
         body: JSON.stringify(input),
       });
       assert.equal(response.status, 200, `${scenario.key}/${role}: interview endpoint`);
@@ -96,7 +108,11 @@ async function main() {
       assert.equal(interview.questions.filter((q) => q.kind === 'common').length, 3);
       assert.equal(interview.questions.filter((q) => q.kind === 'personal').length, 4);
       for (const question of interview.questions) {
-        assert.ok(input.topics.some((t) => t.id === question.topicId));
+        assert.ok(
+          [...input.topics, ...(input.experienceTopics ?? [])].some(
+            (t) => t.id === question.topicId,
+          ),
+        );
         for (const source of question.sources) assert.ok(text.includes(source.excerpt));
       }
       if (role === 'recruiter')
@@ -206,7 +222,16 @@ async function main() {
     actor,
     undefined,
     () => {},
-    new ServerKeywordEvaluator((url, init) => fetch(new URL(String(url), origin), init)),
+    new ServerKeywordEvaluator((url, init) =>
+      fetch(new URL(String(url), origin), {
+        ...init,
+        headers: {
+          ...Object.fromEntries(new Headers(init?.headers)),
+          Origin: new URL(origin).origin,
+          Cookie: sessions.recruiter.cookie,
+        },
+      }),
+    ),
   );
   const analyses = balancedProject.revisions[0].analyses;
   assert.deepEqual(

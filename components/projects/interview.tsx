@@ -1,4 +1,13 @@
 'use client';
+import { authenticatedFetch } from '@/lib/auth/client';
+import { InterviewReviewDialog } from './interview-review';
+import {
+  applyInterviewReview,
+  interviewReviewSchema,
+  reviewStorageKey,
+  type InterviewReview,
+} from '@/lib/interview/review';
+import { InterviewPrompt } from './interview-prompt';
 import { useEffect, useRef, useState } from 'react';
 import { MessageSquare, RefreshCw, Copy, Printer, ArrowUp, ArrowDown, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -13,8 +22,6 @@ import {
   assessmentNames,
   buildInterviewInput,
   interviewText,
-  newPacket,
-  regeneratePacket,
   packetKey,
   stageNames,
   templateQuestions,
@@ -33,15 +40,18 @@ async function generate(input: InterviewInput) {
   if (pending.has(key)) return pending.get(key)!;
   const task = (async () => {
     try {
-      const response = await fetch('/api/interviews', {
+      const response = await authenticatedFetch('/api/interviews', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: key,
         signal: AbortSignal.timeout(30000),
       });
+      if (response.status === 401) throw new Error('login-required');
       if (!response.ok) throw new Error('generation');
       return generationSchema.parse(await response.json());
-    } catch {
+    } catch (error) {
+      if (error instanceof Error && error.message === 'login-required')
+        throw new Error('로그인이 만료되었습니다. 다시 로그인 후 생성해 주세요.');
       return {
         ...templateQuestions(input),
         notice:
@@ -58,13 +68,24 @@ async function generate(input: InterviewInput) {
 }
 
 export function JDInterviewPreview({ draft }: { draft: ProjectDraft }) {
+  const [proposal, setProposal] = useState<{
+    key: string;
+    prompt: string;
+    result: InterviewGeneration;
+  } | null>(null);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [preview, setPreview] = useState<{ key: string; result: InterviewGeneration } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
   if (draft.jd.text.trim().length < 20 || !draft.criteria.some((c) => c.name.trim())) return null;
   const input = buildInterviewInput({
     role: 'applicant',
+    interviewPrompt: draft.interviewPrompt,
     jd: draft.jd,
     criteria: draft.criteria.filter((c) => c.name.trim()),
   });
-  const basic = templateQuestions(input);
+  const key = JSON.stringify(input);
+  const basic = preview?.key === key ? preview.result : templateQuestions(input);
   return (
     <section className="interview-panel interview-preview" aria-label="JD 기반 면접 준비">
       <div className="interview-heading">
@@ -77,6 +98,65 @@ export function JDInterviewPreview({ draft }: { draft: ProjectDraft }) {
           </p>
         </div>
       </div>
+      <Button
+        type="button"
+        disabled={busy || Boolean(proposal)}
+        onClick={async () => {
+          setBusy(true);
+          setError('');
+          try {
+            setProposal({ key, prompt: input.prompt ?? '', result: await generate(input) });
+            setReviewOpen(true);
+          } catch (e) {
+            setError((e as Error).message);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {busy ? 'AI 질문 생성 중…' : 'AI로 질문 생성'}
+      </Button>
+      {proposal && (
+        <>
+          <div className="interview-review-banner">
+            <p>생성된 질문 {proposal.result.questions.length}개가 검토를 기다리고 있습니다.</p>
+            <Button type="button" onClick={() => setReviewOpen(true)}>
+              생성 결과 확인
+            </Button>
+          </div>
+          <InterviewReviewDialog
+            open={reviewOpen}
+            onOpenChange={setReviewOpen}
+            result={proposal.result}
+            prompt={proposal.prompt}
+            previous={basic.questions}
+            previewOnly
+            disabled={proposal.key !== key}
+            error={
+              proposal.key !== key
+                ? 'JD 또는 지침이 변경되었습니다. 취소한 뒤 다시 생성해 주세요.'
+                : undefined
+            }
+            onDiscard={() => {
+              setProposal(null);
+              setReviewOpen(false);
+            }}
+            onApply={() => {
+              if (proposal.key === key) {
+                setPreview({ key, result: proposal.result });
+                setProposal(null);
+                setReviewOpen(false);
+              }
+            }}
+          />
+        </>
+      )}
+      <p role="status">{basic.notice}</p>
+      {error && (
+        <p role="alert" className="project-error">
+          {error}
+        </p>
+      )}
       <ol className="interview-preview-list">
         {basic.questions.map((q) => (
           <li key={q.id}>
@@ -99,31 +179,88 @@ export function InterviewPanel({
   revision: ProjectRevision;
   analysis: ProjectAnalysis;
 }) {
-  const { commitInterview } = useProjects();
+  const { commitInterview, commitInterviewPrompt } = useProjects();
+  const [prompt, setPrompt] = useState(project.interviewPrompt ?? '');
   const packet = project.interviews?.find((p) => p.key === packetKey(revision.id, analysis.id));
   const recruiter = project.role === 'recruiter';
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [review, setReview] = useState<InterviewReview | null>(null);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewReady, setReviewReady] = useState(false);
+  const reviewKey = packetKey(revision.id, analysis.id);
+  const storageKey = reviewStorageKey(project, reviewKey);
   const attempted = useRef(false);
   const lock = useRef(false);
 
+  /* eslint-disable react-hooks/set-state-in-effect -- Restore generated drafts from external tab storage. */
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(storageKey);
+      if (raw) {
+        const saved = interviewReviewSchema.parse(JSON.parse(raw));
+        if (saved.key !== reviewKey) throw new Error('invalid draft');
+        setReview(saved);
+        attempted.current = true;
+      }
+    } catch {
+      attempted.current = true;
+      setError(
+        '임시 생성 결과를 복원하지 못했습니다. 기존 질문은 유지되며 다시 생성할 수 있습니다.',
+      );
+    }
+    setReviewReady(true);
+  }, [storageKey, reviewKey]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  function clearReview() {
+    try {
+      sessionStorage.removeItem(storageKey);
+    } catch {
+      setError('임시 결과 정리에 실패했습니다. 기존 질문은 유지됩니다.');
+    }
+    setReview(null);
+    setReviewOpen(false);
+    attempted.current = true;
+  }
+  function acceptReview() {
+    if (!review) return;
+    try {
+      const next = applyInterviewReview(project, revision, analysis, review, packet);
+      commitInterview(project.id, next, review.baseVersion);
+      clearReview();
+      setError('');
+      setMessage('검토한 질문을 적용했습니다.');
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
   async function createOrRegenerate() {
-    if (lock.current) return;
+    if (lock.current || review || !reviewReady) return;
     lock.current = true;
+    attempted.current = true;
     setBusy(true);
     setError('');
     setMessage('');
-    const input = buildInterviewInput(project, revision, analysis);
-    let base = packet;
+    const input = buildInterviewInput({ ...project, interviewPrompt: prompt }, revision, analysis);
     try {
-      if (!base) {
-        base = newPacket(project, revision, analysis, templateQuestions(input));
-        commitInterview(project.id, base, 0);
-      }
+      commitInterviewPrompt(project.id, prompt, project.interviewPrompt ?? '');
       const result = await generate(input);
-      const next = packet ? regeneratePacket(packet, result) : { ...base, ...result };
-      commitInterview(project.id, next, base.version);
+      const draft = {
+        key: reviewKey,
+        baseVersion: packet?.version ?? 0,
+        createdAt: new Date().toISOString(),
+        prompt,
+        result,
+      };
+      setReview(draft);
+      setReviewOpen(true);
+      try {
+        sessionStorage.setItem(storageKey, JSON.stringify(draft));
+      } catch {
+        setError('생성 결과의 임시 저장에 실패했습니다. 새로고침하기 전에 검토 후 적용해 주세요.');
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -132,13 +269,11 @@ export function InterviewPanel({
     }
   }
   useEffect(() => {
-    if (!recruiter && !packet && !attempted.current) {
-      attempted.current = true;
+    if (reviewReady && !recruiter && !packet && !review && !attempted.current)
       void createOrRegenerate();
-    }
-    // Initialization is once per keyed analysis. Saved packets are reused on every later visit.
+    // Initialize only once per analysis; pending review drafts survive page reloads.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recruiter, packet]);
+  }, [reviewReady, recruiter, packet, review]);
 
   function update(next: InterviewPacket) {
     if (!packet) return;
@@ -166,7 +301,10 @@ export function InterviewPanel({
     ];
     update({ ...packet, questions });
   }
-  const locked = packet?.stage !== 'preparing';
+  const locked = Boolean(packet && packet.stage !== 'preparing');
+  const staleReview = Boolean(
+    review && (review.baseVersion !== (packet?.version ?? 0) || (recruiter && locked)),
+  );
   return (
     <section className="interview-panel" aria-label={recruiter ? '면접 질문지' : '예상 면접 질문'}>
       <div className="interview-heading">
@@ -178,7 +316,7 @@ export function InterviewPanel({
           <h2>{recruiter ? '면접 준비' : '예상 면접 질문'}</h2>
           <p>
             {recruiter
-              ? '같은 공고의 공통 질문과 지원자별 확인 질문을 준비하세요.'
+              ? '공통 질문과 지원서에 작성한 프로젝트·수행 경험을 바탕으로 한 질문을 준비하세요.'
               : '질문의 이유를 확인하고, 자신의 경험으로 답변을 준비하세요.'}
           </p>
         </div>
@@ -201,9 +339,96 @@ export function InterviewPanel({
           {error}
         </p>
       )}
+      <details className="project-criteria-editor">
+        <summary>질문 생성 지침 관리</summary>
+        <InterviewPrompt
+          value={prompt}
+          onChange={setPrompt}
+          disabled={busy || (recruiter && locked)}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          disabled={busy || (recruiter && locked)}
+          onClick={() => {
+            try {
+              commitInterviewPrompt(project.id, prompt, project.interviewPrompt ?? '');
+              setMessage('지침을 저장했습니다. 질문 다시 생성 시 적용됩니다.');
+            } catch (e) {
+              setError((e as Error).message);
+            }
+          }}
+        >
+          지침 저장
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          disabled={busy || (recruiter && locked)}
+          onClick={() => setPrompt('')}
+        >
+          기본 지침으로 초기화
+        </Button>
+        <p>
+          저장된 질문에는 자동 적용되지 않습니다. 질문을 다시 생성해 주세요. 직접 수정한 질문은
+          유지됩니다.
+        </p>
+        {packet && (
+          <small>
+            현재 질문에 사용한 지침:{' '}
+            {packet.generation === 'ai'
+              ? packet.promptUsed || '기본 지침'
+              : '기본 질문 (추가 지침 미적용)'}
+          </small>
+        )}
+      </details>
+      {review && (
+        <>
+          <div className="interview-review-banner" role="status">
+            <div>
+              <strong>새 질문 {review.result.questions.length}개 생성 완료 · 검토 대기</strong>
+              <p>
+                아직 적용하지 않은 결과입니다. 같은 탭에서 새로고침해도 다시 확인할 수 있습니다.
+              </p>
+            </div>
+            <Button
+              type="button"
+              onClick={() => {
+                setError('');
+                setReviewOpen(true);
+              }}
+            >
+              생성 결과 확인
+            </Button>
+          </div>
+          <InterviewReviewDialog
+            open={reviewOpen}
+            onOpenChange={setReviewOpen}
+            result={review.result}
+            prompt={review.prompt}
+            previous={packet?.questions}
+            disabled={staleReview}
+            error={
+              staleReview
+                ? '기존 질문이나 메모가 변경되었습니다. 취소한 뒤 다시 생성해 주세요.'
+                : error
+            }
+            onApply={acceptReview}
+            onDiscard={() => {
+              clearReview();
+              setError('');
+              setMessage('생성 결과를 취소했습니다. 기존 질문을 유지합니다.');
+            }}
+          />
+        </>
+      )}
       {!packet ? (
-        <Button type="button" disabled={busy} onClick={createOrRegenerate}>
-          {recruiter ? '면접 대상으로 선택' : '예상 질문 생성'}
+        <Button
+          type="button"
+          disabled={busy || Boolean(review) || !reviewReady}
+          onClick={createOrRegenerate}
+        >
+          {busy ? '질문 생성 중…' : recruiter ? '면접 대상으로 선택 · 질문 생성' : '예상 질문 생성'}
         </Button>
       ) : (
         <>
@@ -217,7 +442,7 @@ export function InterviewPanel({
               type="button"
               size="sm"
               variant="outline"
-              disabled={busy || (recruiter && locked)}
+              disabled={busy || Boolean(review) || !reviewReady || (recruiter && locked)}
               onClick={createOrRegenerate}
             >
               <RefreshCw size={14} />
@@ -441,11 +666,11 @@ export function InterviewPanel({
               </article>
             ))}
           </div>
-          <p role="status" className="interview-save-status">
-            {message}
-          </p>
         </>
       )}
+      <p role="status" className="interview-save-status">
+        {message}
+      </p>
     </section>
   );
 }

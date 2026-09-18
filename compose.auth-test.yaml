@@ -1,0 +1,23 @@
+# Local verification only: emails are captured by Mailpit, never sent externally.
+# docker compose -f compose.yaml -f compose.auth-test.yaml up -d --wait web mailpit
+# Restore normal mail configuration: docker compose up -d --wait server
+services:
+  integration-test:
+    environment:
+      AUTH_TEST_MAILPIT_URL: http://mailpit:8025
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - '127.0.0.1:8026:8025'
+  server:
+    environment:
+      SPRING_MAIL_HOST: mailpit
+      SPRING_MAIL_PORT: '1025'
+      SPRING_MAIL_USERNAME: ''
+      SPRING_MAIL_PASSWORD: ''
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: 'false'
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: 'false'
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_REQUIRED: 'false'
+    depends_on:
+      mailpit:
+        condition: service_started

@@ -10,7 +10,7 @@ Docker Desktop이 실행 중이어야 한다. 두 저장소에 직무별 분석 
 └── 03_wantedhacker-server/   # Kotlin 서버
 ```
 
-프론트엔드 저장소에서 실행한다. 호스트 Node/Java나 외부 API 키 없이 컨테이너에서 빌드한다.
+프론트엔드 저장소에서 실행한다. 호스트 Node/Java 없이 컨테이너에서 빌드한다. 이메일 인증에는 SMTP 설정이 필요하다. 외부 발송 없는 로컬 테스트 실행은 [이메일 인증 문서](email-auth.md)를 참고한다.
 
 ```sh
 docker compose up --build -d --wait --wait-timeout 240 web
@@ -44,7 +44,7 @@ SERVER_SOURCE_DIR=/절대/경로/server WEB_PORT=3100 SERVER_PORT=18080 docker c
 
 ```sh
 # 가상 이력서 3명 + 집중형/균형형 2명: 웹 프록시 → 실제 Kotlin API 검증
-docker compose --profile test run --build --rm integration-test
+docker compose -f compose.yaml -f compose.auth-test.yaml run --build --rm integration-test
 
 # 프론트엔드 단위 테스트·린트·타입 검사
 docker compose --profile test run --build --rm test
@@ -57,13 +57,13 @@ docker compose --profile test run --build --rm server-test
 
 수동 테스트:
 
-1. http://localhost:3000/home 에서 채용담당자 데모로 로그인한다.
+1. http://localhost:3000/home 에서 이용 유형을 채용담당자로 선택하고 이메일 인증 코드로 로그인한다.
 2. 새 프로젝트에서 백엔드·프론트엔드·구축 PM 등 분석 직무를 선택한다.
 3. `tests/fixtures/synthetic-resumes/`의 `*-jd.txt`를 JD로 입력하고 대응 이력서 TXT를 등록한다.
 4. 핵심 항목과 충족 기준을 설정하고 분석한다.
 5. 점수·원문 근거·충족률을 확인한다. 복수 지원자를 등록하면 균형순과 총점순을 비교할 수 있다.
 
-TXT/PDF는 브라우저에서 읽으므로 파일을 컨테이너에 복사할 필요가 없다. 이미지 PDF의 OCR과 실제 로그인은 연결하지 않는다. 면접 질문 AI는 기본 비활성이며, 선택적 연결 방법은 [면접 준비 문서](interview-preparation.md)를 참고한다.
+TXT/PDF는 브라우저에서 읽으므로 파일을 컨테이너에 복사할 필요가 없다. 이미지 PDF의 OCR은 아직 연결하지 않는다. 로그인은 서버 이메일 인증을 사용한다. 면접 질문 AI 키는 백엔드 `.env`에 설정하며, 로그인 세션과 연결 설정은 [면접 준비 문서](interview-preparation.md)를 참고한다.
 
 ## 개발 모드
 

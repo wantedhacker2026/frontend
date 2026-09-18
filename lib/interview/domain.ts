@@ -1,7 +1,6 @@
 import type {
   AnalysisProject,
   ProjectAnalysis,
-  ProjectCriterion,
   ProjectDB,
   ProjectRevision,
 } from '@/lib/projects/types';
@@ -12,6 +11,7 @@ import {
   type InterviewGeneration,
   type InterviewQuestion,
 } from './types';
+import { extractExperienceTopics } from './experiences';
 
 export const INTERVIEW_VERSION = 'interview-v1';
 export const assessmentNames = {
@@ -26,7 +26,7 @@ export function packetKey(revisionId: string, analysisId: string) {
 }
 
 export function buildInterviewInput(
-  project: Pick<AnalysisProject, 'role' | 'jd' | 'criteria'>,
+  project: Pick<AnalysisProject, 'role' | 'jd' | 'criteria' | 'interviewPrompt'>,
   revision?: ProjectRevision,
   analysis?: ProjectAnalysis,
 ): InterviewInput {
@@ -75,73 +75,62 @@ export function buildInterviewInput(
       sources,
     };
   });
-  const priority = (c: ProjectCriterion) => {
-    const topic = topics.find((t) => t.id === c.id)!;
-    return (topic.evidence !== 'confirmed' ? 10 : 0) + (c.core || c.required ? 5 : 0);
-  };
   return {
+    prompt: project.interviewPrompt ?? '',
     role: project.role,
     topics,
-    priorityIds: [...criteria].sort((a, b) => priority(b) - priority(a)).map((c) => c.id),
+    experienceTopics:
+      revision && analysis
+        ? extractExperienceTopics(revision, analysis.personId, criteria, project.jd.text)
+        : [],
+    // Retained for older clients; personal questions now select from experienceTopics.
+    priorityIds: criteria.map((c) => c.id),
     personalized: Boolean(analysis),
   };
 }
 
 export function templateQuestions(input: InterviewInput): InterviewGeneration {
   const commonPrompts = [
-    (name: string) => `${name} 업무를 맡는다면 무엇을 먼저 확인하고 어떤 순서로 진행하시겠습니까?`,
-    (name: string) =>
-      `${name} 업무에서 일정과 품질이 충돌할 때 어떤 기준으로 우선순위를 정하시겠습니까?`,
-    (name: string) => `${name} 업무의 결과를 어떻게 검증하고 이해관계자에게 설명하시겠습니까?`,
-    (name: string) => `${name} 업무에서 발생할 수 있는 예외 상황과 대응 방법을 설명해 주세요.`,
-    (name: string) =>
-      `${name} 업무를 다른 담당자와 협업할 때 역할과 의사결정을 어떻게 정리하시겠습니까?`,
-    (name: string) => `${name} 업무를 더 잘 수행하기 위해 어떤 정보를 수집하고 개선하시겠습니까?`,
+    (name: string) => `${name} 관련 업무를 시작할 때 무엇부터 확인하시겠어요?`,
+    (name: string) => `${name} 업무에서 일정과 품질이 충돌하면 무엇을 우선하시겠어요?`,
+    (name: string) => `${name} 업무의 결과가 잘 나왔는지 어떻게 확인하시겠어요?`,
+    (name: string) => `${name} 업무에서 예상과 다른 결과가 나오면 어떻게 대응하시겠어요?`,
+    (name: string) => `${name} 업무에서 동료와 의견이 다르면 어떻게 조율하시겠어요?`,
+    (name: string) => `${name} 업무에서 먼저 개선하고 싶은 부분은 무엇인가요?`,
   ];
+  const experiences = input.experienceTopics ?? [];
   const personalPrompts = [
-    (name: string, has: boolean) =>
-      has
-        ? `서류에 기재한 ${name} 경험에서 직접 담당한 범위와 팀이 담당한 범위를 설명해 주세요.`
-        : `${name}과 관련해 직접 수행한 사례가 있다면 본인의 역할과 진행 과정을 설명해 주세요.`,
-    (name: string) =>
-      `${name}과 관련해 선택했던 대안과 선택 이유를 설명해 주세요. 실제 사례가 없다면 접근 방법을 말씀해 주세요.`,
-    (name: string) =>
-      `${name} 업무에서 어려움이나 예외 상황을 어떻게 해결하고 결과를 검증했는지 설명해 주세요.`,
-    (name: string) =>
-      `${name}과 관련한 결과를 무엇으로 확인했나요? 본인의 기여와 다음에 개선할 점을 설명해 주세요.`,
+    '이 경험에서 직접 맡은 일은 무엇인가요?',
+    '그 방법을 선택한 이유는 무엇인가요?',
+    '진행하면서 가장 어려웠던 점은 무엇인가요?',
+    '작업 결과는 어떻게 확인하셨나요?',
+  ];
+  const personalFollowups = [
+    ['처음 해결하려던 문제는 무엇이었나요?', '직접 맡은 부분은 어떻게 진행하셨나요?'],
+    ['다른 방법도 검토하셨나요?', '선택에 가장 크게 영향을 준 조건은 무엇인가요?'],
+    ['어떤 방식으로 풀어가셨나요?', '그 방법이 효과가 있었는지 어떻게 확인하셨나요?'],
+    ['어떤 기준으로 결과를 판단하셨나요?', '다시 한다면 어떤 부분을 바꾸고 싶나요?'],
   ];
   function question(index: number, personal: boolean): InterviewQuestion {
-    const id = personal ? input.priorityIds[index % input.priorityIds.length] : undefined;
-    const topic =
-      (id && input.topics.find((t) => t.id === id)) || input.topics[index % input.topics.length];
+    const topic = personal
+      ? experiences[index % experiences.length]
+      : input.topics[index % input.topics.length];
     const sources = personal ? topic.sources : [];
     const reason = !personal
       ? '채용공고의 직무 수행 방식과 판단 기준을 준비하는 공통 질문입니다.'
-      : topic.evidence === 'unreadable'
-        ? '서류 일부를 읽지 못해 확인할 내용입니다. 경험이 없다는 의미는 아닙니다.'
-        : sources.length
-          ? '서류의 관련 경험에서 실제 역할, 판단 과정과 결과를 구체적으로 확인합니다.'
-          : '서류에서 관련 근거를 찾지 못했습니다. 실제 경험 또는 접근 방법을 이야기할 수 있도록 준비하세요.';
+      : '지원서에 작성한 경험을 주제로 선정했습니다. 실제 역할, 판단 과정과 결과를 구체적으로 확인합니다.';
     return {
       id: `${personal ? 'personal' : 'common'}-${index}`,
       topicId: topic.id,
       topic: topic.name,
       kind: personal ? 'personal' : 'common',
-      question: personal
-        ? personalPrompts[index % 4](topic.name, sources.length > 0)
-        : commonPrompts[index % 6](topic.name),
+      question: personal ? personalPrompts[index % 4] : commonPrompts[index % 6](topic.name),
       reason,
       jdEvidence: topic.jdEvidence,
       sources,
       followups: personal
-        ? [
-            '본인이 내린 결정과 그 이유는 무엇인가요?',
-            '결과를 확인할 수 있는 근거나 배운 점이 있나요?',
-          ]
-        : [
-            '그 우선순위를 선택한 이유는 무엇인가요?',
-            '예상과 다른 결과가 나오면 어떻게 대응하시겠습니까?',
-          ],
+        ? personalFollowups[index % 4]
+        : ['그렇게 생각한 이유는 무엇인가요?', '비슷한 상황을 겪어본 적이 있나요?'],
       guide: [
         '상황과 목표를 짧게 정리하세요.',
         '직접 한 행동과 선택 이유를 구분하세요.',
@@ -154,7 +143,15 @@ export function templateQuestions(input: InterviewInput): InterviewGeneration {
     };
   }
   const questions = Array.from({ length: 3 }, (_, i) => question(i, false));
-  if (input.personalized) questions.push(...Array.from({ length: 4 }, (_, i) => question(i, true)));
+  if (input.personalized && experiences.length)
+    questions.push(...Array.from({ length: 4 }, (_, i) => question(i, true)));
+  else if (input.personalized)
+    return {
+      generation: 'template',
+      notice:
+        '지원서에서 구체적인 수행 경험을 추출하지 못해 공통 질문만 표시합니다. 프로젝트·역할·수행 내용이 적힌 서류를 등록해 주세요.',
+      questions,
+    };
   else questions.push(...Array.from({ length: 3 }, (_, i) => question(i + 3, false)));
   return {
     generation: 'template',
@@ -172,6 +169,7 @@ export function newPacket(
   const now = new Date().toISOString();
   return {
     ...generation,
+    promptUsed: generation.generation === 'ai' ? (project.interviewPrompt ?? '') : '',
     key: packetKey(revision.id, analysis.id),
     role: project.role,
     revisionId: revision.id,

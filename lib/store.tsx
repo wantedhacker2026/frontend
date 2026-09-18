@@ -5,6 +5,7 @@ import { createSeedDatabase } from '@/data/mock/seed';
 import { evaluator } from './evaluation/mock-evaluator';
 import { validateCriteria } from '@/data/mock/criteria';
 import { parseDatabase, STORAGE_KEY } from './persistence';
+import { useProjects } from './projects/store';
 import {
   duplicateResumeVersion,
   prepareResumeSubmission,
@@ -35,6 +36,17 @@ interface Store {
 }
 const Context = createContext<Store | null>(null);
 export function StoreProvider({ children }: { children: ReactNode }) {
+  const { actor } = useProjects();
+  const storageKey = actor
+    ? `${STORAGE_KEY}:account:${actor.id}:${actor.role}`
+    : `${STORAGE_KEY}:guest`;
+  return (
+    <ScopedStore key={storageKey} storageKey={storageKey}>
+      {children}
+    </ScopedStore>
+  );
+}
+function ScopedStore({ children, storageKey }: { children: ReactNode; storageKey: string }) {
   const [db, setDb] = useState<Database>(createSeedDatabase);
   const dbRef = useRef(db);
   const [ready, setReady] = useState(false);
@@ -43,7 +55,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   /* eslint-disable react-hooks/set-state-in-effect -- Local storage hydration must follow SSR. */
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(storageKey);
       if (saved) {
         const restored = parseDatabase(saved);
         dbRef.current = restored;
@@ -55,11 +67,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       );
     }
     setReady(true);
-  }, []);
+  }, [storageKey]);
   /* eslint-enable react-hooks/set-state-in-effect */
   function commit(next: Database, requireStorage = false) {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      localStorage.setItem(storageKey, JSON.stringify(next));
     } catch {
       if (requireStorage)
         throw new Error(

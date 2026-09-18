@@ -1,11 +1,12 @@
 import type { CandidateEvaluator } from './interface';
+import { authenticatedFetch } from '@/lib/auth/client';
 import { keywordRequestSchema, keywordResponseSchema } from './keyword-contract';
 import { calculateScore } from '@/lib/scoring';
 import { getJobProfile, JOB_PROFILE_CATALOG_VERSION } from './job-profiles';
 import type { Application, EvaluationCriterion, EvaluationItem, Job } from '@/types';
 
 export class ServerKeywordEvaluator implements CandidateEvaluator {
-  constructor(private readonly request: typeof fetch = (...args) => fetch(...args)) {}
+  constructor(private readonly request: typeof fetch = authenticatedFetch) {}
 
   async evaluate(job: Job, criteria: EvaluationCriterion[], application: Application) {
     const profile = getJobProfile(job.role);

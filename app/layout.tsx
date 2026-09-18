@@ -15,11 +15,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <a className="skip-link" href="#content">
           본문으로 이동
         </a>
-        <StoreProvider>
-          <ProjectProvider>
+        <ProjectProvider>
+          <StoreProvider>
             <div id="content">{children}</div>
-          </ProjectProvider>
-        </StoreProvider>
+          </StoreProvider>
+        </ProjectProvider>
       </body>
     </html>
   );
