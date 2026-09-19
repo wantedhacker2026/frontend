@@ -1,5 +1,6 @@
 'use client';
 import { authenticatedFetch } from '@/lib/auth/client';
+import Link from 'next/link';
 import { InterviewReviewDialog } from './interview-review';
 import { CareerEvidenceSummary, InterviewSourceEvidence } from './interview-evidence';
 import {
@@ -77,6 +78,7 @@ export function InterviewPanel({
   const packet = project.interviews?.find((p) => p.key === packetKey(revision.id, analysis.id));
   const recruiter = project.role === 'recruiter';
   const questionPrefix = useId();
+  const generationStatusId = useId();
   const sourceContext = { revision, personId: analysis.personId };
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -211,6 +213,17 @@ export function InterviewPanel({
   const staleReview = Boolean(
     review && (review.baseVersion !== (packet?.version ?? 0) || (recruiter && locked)),
   );
+  const generationBlockedReason = !reviewReady
+    ? '저장된 질문 상태를 확인하고 있습니다.'
+    : busy
+      ? '질문을 생성하고 근거를 확인하고 있습니다.'
+      : review
+        ? '검토 대기 중인 질문이 있습니다. 생성 결과 확인에서 적용하거나 취소해 주세요.'
+        : recruiter && locked
+          ? '질문지가 확정되었거나 면접이 완료되었습니다. 질문 수정하기를 누르면 다시 생성할 수 있습니다.'
+          : !hasCareer
+            ? '질문 생성에 사용할 경력 근거가 없습니다.'
+            : '';
   return (
     <section className="interview-panel" aria-label={recruiter ? '면접 질문지' : '예상 면접 질문'}>
       <div className="interview-heading">
@@ -243,11 +256,6 @@ export function InterviewPanel({
       {error && (
         <p role="alert" className="project-error">
           {error}
-        </p>
-      )}
-      {!hasCareer && !recruiter && (
-        <p className="project-notice" role="status">
-          {templateQuestions(input).notice}
         </p>
       )}
       {!packet && hasPreviousQuestions && (
@@ -348,10 +356,32 @@ export function InterviewPanel({
           />
         </>
       )}
+      {generationBlockedReason && (
+        <div className="project-notice" id={generationStatusId} role="status">
+          <strong>{generationBlockedReason}</strong>
+          {!hasCareer && reviewReady && !busy && !review && !(recruiter && locked) && (
+            <>
+              <p>
+                {analysis.results.some((result) => result.sources.length > 0)
+                  ? 'JD 기준표에는 서류 전체에서 찾은 키워드 언급도 표시됩니다. 직무에 대한 관심이나 지원 동기만으로는 경력 질문을 만들지 않습니다.'
+                  : '예상 질문은 이력서의 경력 구역에서 확인한 담당 업무와 수행 경험으로 생성합니다.'}
+              </p>
+              <p>
+                이력서 원문에 경력 제목과 실제로 수행한 업무가 포함되어 있는지 확인해 주세요.
+                PDF에서 제목이나 문장이 나뉜 경우에도 추출되지 않을 수 있습니다.
+              </p>
+              <Link href={`/new-project?projectId=${project.id}`}>
+                서류 원문 확인·수정 후 재분석
+              </Link>
+            </>
+          )}
+        </div>
+      )}
       {!packet ? (
         <Button
           type="button"
           disabled={!hasCareer || busy || Boolean(review) || !reviewReady}
+          aria-describedby={generationBlockedReason ? generationStatusId : undefined}
           onClick={createOrRegenerate}
         >
           {busy
@@ -375,6 +405,7 @@ export function InterviewPanel({
               disabled={
                 !hasCareer || busy || Boolean(review) || !reviewReady || (recruiter && locked)
               }
+              aria-describedby={generationBlockedReason ? generationStatusId : undefined}
               onClick={createOrRegenerate}
             >
               <RefreshCw size={14} />

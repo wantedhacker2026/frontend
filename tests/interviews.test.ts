@@ -389,6 +389,46 @@ test('questions are empty when the applicant has no career section even if JD ma
   assert.deepEqual(templateQuestions(buildInterviewInput(p, r, a)).questions, []);
 });
 
+test('planning motivation in a JD result cannot enable career questions, even under a career heading', () => {
+  const { p, r, a } = setup('applicant');
+  const motivation =
+    '과 소통하고 토론하며 결과를 만들어가는 과정이 서비스 기획 직무와 맞닿아 있음을 느껴 관심을 갖게 되었습니다.';
+  p.criteria = [
+    {
+      id: 'planning',
+      name: '문제·요구사항 정의',
+      keywords: ['서비스 기획'],
+      required: true,
+      description: '기획',
+    },
+  ];
+  a.results = [
+    {
+      criterionId: 'planning',
+      mentioned: true,
+      reading: 'O',
+      status: 'review',
+      reason: '키워드 언급',
+      sources: [{ documentId: 'doc', filename: '가상 이력서.txt', page: 2, excerpt: motivation }],
+    },
+  ];
+  for (const title of ['지원 동기', '경력 사항']) {
+    r.documents[0].pages = [{ number: 2, text: `${title}\n${motivation}` }];
+    const input = buildInterviewInput(p, r, a);
+    assert.equal(a.results[0].sources.length, 1);
+    assert.equal(input.experienceTopics?.length, 0);
+    assert.equal(templateQuestions(input).questions.length, 0);
+  }
+  const career = '고객 요구사항을 정리하고 주문 화면을 설계했습니다.';
+  r.documents[0].pages[0].text += `\n${career}`;
+  const input = buildInterviewInput(p, r, a);
+  assert.deepEqual(
+    input.experienceTopics?.map((topic) => topic.sources[0].excerpt),
+    [career],
+  );
+  assert.equal(templateQuestions(input).questions.length, 4);
+});
+
 test('generation input excludes identity, internal scores, weights and saved private notes', () => {
   const { p, r, a, packet } = setup('applicant');
   packet.questions[0].note = 'PRIVATE NOTE';
