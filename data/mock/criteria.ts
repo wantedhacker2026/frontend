@@ -1,4 +1,5 @@
 import type { Category, EvaluationCriterion } from '@/types';
+import { keywordPattern } from '@/lib/evaluation/keyword-pattern';
 type Template = {
   name: string;
   category: Category;
@@ -415,8 +416,7 @@ const templates: Template[] = [
 ];
 export function containsKeyword(text: string, keyword: string): boolean {
   if (!keyword.trim()) return false;
-  const escaped = keyword.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`(?<![a-z0-9])${escaped}(?![a-z0-9])`, 'i').test(text);
+  return keywordPattern(keyword).test(text.normalize('NFKC'));
 }
 export function normalizeWeights(criteria: EvaluationCriterion[]): EvaluationCriterion[] {
   if (!criteria.length) return criteria;

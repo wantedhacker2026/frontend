@@ -76,14 +76,20 @@ export function deriveJobCriteria(text: string, profileId: JobProfileId) {
     let section: 'required' | 'preferred' | undefined;
     let required = false;
     let preferred = false;
+    const sections: { kind: typeof section; lines: string[] }[] = [];
     for (const line of text.split('\n')) {
       if (/우대\s*사항|우대\s*조건|preferred/i.test(line)) section = 'preferred';
       else if (/자격\s*요건|지원\s*자격|필수\s*조건|필수\s*역량|requirements/i.test(line))
         section = 'required';
       else if (/주요\s*업무|기술\s*스택|일하는\s*방식/.test(line)) section = undefined;
-      if (keywords.some((keyword) => containsKeyword(line, keyword))) {
-        if (section === 'required') required = true;
-        if (section === 'preferred') preferred = true;
+      if (!sections.length || sections.at(-1)!.kind !== section)
+        sections.push({ kind: section, lines: [] });
+      sections.at(-1)!.lines.push(line);
+    }
+    for (const block of sections) {
+      if (keywords.some((keyword) => containsKeyword(block.lines.join('\n'), keyword))) {
+        if (block.kind === 'required') required = true;
+        if (block.kind === 'preferred') preferred = true;
       }
     }
     return [

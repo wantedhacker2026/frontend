@@ -10,6 +10,8 @@ import { deriveCriteria, processDraft, parseProjects, revisionDraft } from '../l
 import { demoDraft } from '../lib/projects/demo';
 import { ServerKeywordEvaluator } from '../lib/evaluation/server-keyword-evaluator';
 import type { ProjectActor } from '../lib/projects/types';
+import { containsKeyword } from '../data/mock/criteria';
+import { sourceExcerpt } from '../lib/projects/evidence';
 
 const actor: ProjectActor = {
   id: 'profile-test',
@@ -17,6 +19,79 @@ const actor: ProjectActor = {
   role: 'recruiter',
   provider: '데모',
 };
+
+test('planning JD accepts compact Korean phrases, PDF wraps and preserves preferred sections', () => {
+  for (const jd of ['서비스기획 및 화면설계 담당', '서비스\n기획 및 화면\n설계 담당']) {
+    const criteria = deriveCriteria(jd, 'service-planning');
+    assert.deepEqual(
+      criteria.map((c) => c.catalogCriterionId),
+      ['requirements', 'specification'],
+    );
+    assert.ok(
+      criteria
+        .find((c) => c.catalogCriterionId === 'specification')
+        ?.keywords.includes('화면 설계'),
+    );
+  }
+  assert.equal(deriveCriteria('우대사항\n화면\n설계 경험', 'service-planning')[0].required, false);
+  assert.equal(containsKeyword('Ｎｅｘｔ.js', 'next.js'), true);
+  assert.equal(containsKeyword('NoSQL JavaScript RESTAPI', 'SQL'), false);
+  assert.equal(containsKeyword('NoSQL JavaScript RESTAPI', 'Java'), false);
+  assert.equal(containsKeyword('RESTAPI', 'REST API'), false);
+});
+
+test('wrapped evidence retains the original page whitespace and does not invent text', () => {
+  assert.equal(
+    sourceExcerpt('경력\n화면\n  설계를 담당했습니다.\n학력', '화면\n설계를 담당했습니다.'),
+    '화면\n  설계를 담당했습니다.',
+  );
+  assert.equal(sourceExcerpt('화면\n설계', '화면\n구현'), undefined);
+});
+
+test('wrapped planning matches link to the source page and pages remain separated', async () => {
+  const draft = demoDraft(actor);
+  draft.jobProfile = 'service-planning';
+  draft.profileCatalogVersion = JOB_PROFILE_CATALOG_VERSION;
+  draft.jd.text = '화면 설계 경험을 보유한 서비스 기획자를 모집합니다.';
+  draft.criteria = deriveCriteria(draft.jd.text, draft.jobProfile).filter(
+    (c) => c.catalogCriterionId === 'specification',
+  );
+  draft.people = draft.people.slice(0, 1);
+  draft.documents = draft.documents.filter((d) => d.applicantId === draft.people[0].id).slice(0, 1);
+  draft.documents[0].pages = [
+    { number: 1, text: '경력\n화면\n  설계를 담당했습니다.' },
+    { number: 2, text: '서비스 운영 경험' },
+  ];
+  const evaluator = new ServerKeywordEvaluator(async (_url, init) => {
+    const body = JSON.parse(String(init?.body));
+    assert.ok(body.text.includes('담당했습니다.\f서비스 운영 경험'));
+    return Response.json({
+      version: `experience-keywords-v5:${JOB_PROFILE_CATALOG_VERSION}`,
+      results: [
+        {
+          criterionId: draft.criteria[0].id,
+          related: true,
+          evidenceLevel: 2,
+          evidence: '화면\n설계를 담당했습니다.',
+          matches: [
+            {
+              jdKeyword: '화면 설계',
+              relation: 'DIRECT',
+              matchedKeyword: '화면 설계',
+              evidence: '화면\n설계를 담당했습니다.',
+            },
+          ],
+        },
+      ],
+    });
+  });
+  const result = (await processDraft(draft, actor, undefined, () => {}, evaluator)).revisions[0]
+    .analyses[0].results[0];
+  assert.equal(result.reading, 'O');
+  assert.equal(result.status, 'confirmed');
+  assert.equal(result.sources[0].page, 1);
+  assert.equal(result.sources[0].excerpt, '화면\n  설계를 담당했습니다.');
+});
 
 test('all 12 profiles have distinct criteria, 100 points and extract their own detailed lists', () => {
   assert.equal(jobProfiles.length, 12);

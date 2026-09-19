@@ -18,3 +18,14 @@ export function evidenceLines(text: string): string[] {
       return true;
     });
 }
+
+/** Resolve server evidence back to the original page, preserving PDF whitespace. */
+export function sourceExcerpt(text: string, evidence: string): string | undefined {
+  if (!evidence.trim()) return undefined;
+  const pattern = evidence
+    .trim()
+    .split(/\s+/u)
+    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('\\s+');
+  return text.match(new RegExp(pattern, 'u'))?.[0];
+}

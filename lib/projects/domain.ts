@@ -11,7 +11,7 @@ import { MockCandidateEvaluator } from '@/lib/evaluation/mock-evaluator';
 import { ServerKeywordEvaluator } from '@/lib/evaluation/server-keyword-evaluator';
 import { MAX_ANALYSIS_CRITERIA } from '@/lib/evaluation/limits';
 import type { Application, EvaluationCriterion, Job } from '@/types';
-import { evidenceLines } from './evidence';
+import { evidenceLines, sourceExcerpt } from './evidence';
 import { sectionHeading, type SectionKey } from '@/lib/job-postings/types';
 import {
   projectDBSchema,
@@ -53,8 +53,8 @@ export function deriveCriteria(
     });
     return criteria.map((criterion) => ({
       ...criterion,
-      required: requiredLines.some((line) =>
-        criterion.keywords.some((keyword) => containsKeyword(line, keyword)),
+      required: criterion.keywords.some((keyword) =>
+        containsKeyword(requiredLines.join('\n'), keyword),
       ),
     }));
   }
@@ -180,7 +180,10 @@ export async function processDraft(
   for (const person of people) {
     const documents = draft.documents.filter((d) => d.applicantId === person.id);
     const readable = documents.filter((d) => d.status === 'ready');
-    const text = readable.flatMap((d) => d.pages.flatMap((p) => evidenceLines(p.text))).join('\n');
+    // Form feed keeps a split keyword from joining across files or pages.
+    const text = readable
+      .flatMap((d) => d.pages.map((p) => evidenceLines(p.text).join('\n')))
+      .join('\f');
     const application: Application = {
       id: crypto.randomUUID(),
       candidateId: person.id,
@@ -205,18 +208,25 @@ export async function processDraft(
       const sources = readable
         .flatMap((d) =>
           d.pages.flatMap((page) =>
-            evidenceLines(page.text)
-              .filter((line) =>
-                item.keywordMatches
-                  ? item.keywordMatches.some((m) => m.relation !== 'NONE' && m.evidence === line)
-                  : c.keywords.some((k) => containsKeyword(line, k)),
-              )
-              .map((excerpt) => ({
-                documentId: d.id,
-                filename: d.filename,
-                page: page.number,
-                excerpt: excerpt.trim(),
-              })),
+            (item.keywordMatches
+              ? [
+                  ...new Set(
+                    item.keywordMatches.flatMap((m) => {
+                      if (m.relation === 'NONE' || !m.evidence) return [];
+                      const excerpt = sourceExcerpt(page.text, m.evidence);
+                      return excerpt ? [excerpt] : [];
+                    }),
+                  ),
+                ]
+              : evidenceLines(page.text).filter((line) =>
+                  c.keywords.some((k) => containsKeyword(line, k)),
+                )
+            ).map((excerpt) => ({
+              documentId: d.id,
+              filename: d.filename,
+              page: page.number,
+              excerpt: excerpt.trim(),
+            })),
           ),
         )
         .sort((a, b) => evidenceRank(b.excerpt) - evidenceRank(a.excerpt))
