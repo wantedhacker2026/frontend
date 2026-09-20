@@ -5,6 +5,7 @@ import type { InterviewGeneration, InterviewQuestion } from '@/lib/interview/typ
 import { reviewQuestionStatus } from '@/lib/interview/review';
 import type { EvidenceContext } from '@/lib/interview/evidence';
 import { InterviewSourceEvidence } from './interview-evidence';
+import { ExperienceContextSummary } from './experience-context';
 
 const statusNames = {
   new: '새 질문',
@@ -122,6 +123,7 @@ export function InterviewReviewDialog({
                   </ul>
                 </section>
               </div>
+              <ExperienceContextSummary question={q} />
               {(status === 'kept' || status === 'excluded') && (
                 <p className="interview-review-preserved">
                   {status === 'kept'

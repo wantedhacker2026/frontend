@@ -71,12 +71,9 @@ export function ProjectShell({ children }: { children: ReactNode }) {
           {(!actor || !projects.length) && <p>생성한 프로젝트 없음</p>}
         </nav>
         <div className="project-sidebar-bottom">
-          {actor && (
-            <Link
-              href={actor.role === 'applicant' ? '/resumes' : '/recruiter/jobs'}
-              className="project-legacy-link"
-            >
-              {actor.role === 'applicant' ? '저장한 지원서 관리' : '기존 채용 대시보드'}
+          {actor?.role === 'applicant' && (
+            <Link href="/resumes" className="project-legacy-link">
+              저장한 지원서 관리
               <ArrowUpRight size={14} />
             </Link>
           )}

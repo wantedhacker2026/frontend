@@ -25,6 +25,7 @@ export function reviewQuestionStatus(question: InterviewQuestion, previous?: Int
   return old.topic === question.topic &&
     old.reason === question.reason &&
     JSON.stringify(old.sources) === JSON.stringify(question.sources) &&
+    JSON.stringify(old.context) === JSON.stringify(question.context) &&
     old.grounding === question.grounding &&
     old.question === question.question &&
     JSON.stringify(old.followups) === JSON.stringify(question.followups) &&

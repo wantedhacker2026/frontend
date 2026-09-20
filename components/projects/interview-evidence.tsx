@@ -11,6 +11,7 @@ import {
   type InterviewSource,
 } from '@/lib/interview/evidence';
 import type { InterviewInput, InterviewQuestion } from '@/lib/interview/types';
+import { ExperienceContextSummary } from './experience-context';
 
 export function InterviewSourceEvidence({
   context,
@@ -123,6 +124,13 @@ export function CareerEvidenceSummary({
                   </span>
                 </div>
                 <InterviewSourceEvidence context={context} source={row.source} />
+                {row.questions[0] ? (
+                  <ExperienceContextSummary question={row.questions[0].question} />
+                ) : (
+                  <p className="career-evidence-hint">
+                    질문 생성 시 활동 유형·대상·역할·규모의 의미를 해석하고 원문과 대조합니다.
+                  </p>
+                )}
                 {row.questions.length > 0 && (
                   <div className="career-evidence-links">
                     <strong>이 경력에서 확인할 내용</strong>

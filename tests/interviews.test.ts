@@ -17,6 +17,7 @@ import {
 } from '../lib/interview/review';
 import { generateInterview } from '../lib/interview/generator';
 import { interviewInputSchema } from '../lib/interview/types';
+import { validExperienceContext } from '../lib/interview/context';
 import { parseProjects, saveProject } from '../lib/projects/domain';
 import type { AnalysisProject, ProjectDB } from '../lib/projects/types';
 import { authFixture } from './auth-fixture';
@@ -146,6 +147,20 @@ function setup(role: 'applicant' | 'recruiter' = 'recruiter') {
     projects: [p],
   };
   return { p, r, a, input, packet, db };
+}
+
+function contextFor(experienceId: string, evidenceId: string, value = 'Java API') {
+  return {
+    experienceId,
+    activityType: 'software-development',
+    status: 'clear',
+    target: { value, evidenceId },
+    action: { value, evidenceId },
+    role: null,
+    participants: null,
+    scale: null,
+    scaleMeaning: 'unknown',
+  };
 }
 
 test('JD-only gives no questions; career evidence gives four personal questions', () => {
@@ -286,6 +301,7 @@ test('only career sections reach question generation, excluding stronger non-car
             id: q.id,
             experienceId: q.experienceId,
             evidenceIds: q.evidenceIds,
+            context: contextFor(q.experienceId, q.evidenceIds[0], '주문 API'),
             title: '주문 API 성능 개선',
             reason: '직접 담당한 API 개발 범위를 확인합니다.',
             grounding: 'verified',
@@ -387,6 +403,131 @@ test('questions are empty when the applicant has no career section even if JD ma
   const { p, r, a } = setup();
   r.documents[0].pages[0].text = 'Java API를 구현하여 처리 시간을 개선했습니다.';
   assert.deepEqual(templateQuestions(buildInterviewInput(p, r, a)).questions, []);
+});
+
+test('study interpretation survives generation, review and storage with participant scale attached to the original quote', async () => {
+  const { p, r, a, db } = setup();
+  const excerpt = '회사 업무로 50명 규모의 개발자 스터디를 운영했습니다.';
+  r.documents[0].pages = [
+    { number: 2, text: `경력 사항\n사내 교육 담당\n${excerpt}\n학력\n학교 동아리 활동` },
+  ];
+  const input = buildInterviewInput(p, r, a);
+  assert.ok(input.experienceTopics![0].careerContext?.includes('사내 교육 담당'));
+  assert.ok(!input.experienceTopics![0].careerContext?.includes('학교 동아리'));
+  const result = await generateInterview(input, {
+    serverUrl: 'http://server',
+    proxySecret: 'fake',
+    fetch: async (_url, options) => {
+      const body = JSON.parse(String(options?.body));
+      return Response.json({
+        questions: body.questions.map(
+          (q: {
+            id: string;
+            experienceId: string;
+            evidenceIds: string[];
+            careerContext: string;
+          }) => {
+            assert.ok(q.careerContext.includes('사내 교육 담당'));
+            return {
+              id: q.id,
+              experienceId: q.experienceId,
+              evidenceIds: q.evidenceIds,
+              title: '개발자 스터디 운영',
+              reason: '직접 맡은 활동을 확인합니다.',
+              grounding: 'verified',
+              question: '스터디 운영에서 직접 맡은 일은 무엇인가요?',
+              followups: ['진행 방식은 어떻게 정해졌나요?'],
+              guide: ['직접 수행한 일을 정리하세요.'],
+              context: {
+                experienceId: q.experienceId,
+                activityType: 'community-operation',
+                status: 'clear',
+                target: { value: '개발자 스터디', evidenceId: q.evidenceIds[0] },
+                action: { value: '운영', evidenceId: q.evidenceIds[0] },
+                role: null,
+                participants: { value: '개발자', evidenceId: q.evidenceIds[0] },
+                scale: { value: '50명', evidenceId: q.evidenceIds[0] },
+                scaleMeaning: 'participants',
+              },
+            };
+          },
+        ),
+      });
+    },
+  });
+  assert.equal(result.generation, 'ai');
+  const q = result.questions[0];
+  assert.equal(q.context?.activityType, 'community-operation');
+  assert.equal(q.context?.role, null);
+  assert.equal(q.context?.scaleMeaning, 'participants');
+  assert.equal(validExperienceContext(q.context!, q), true);
+  assert.equal(
+    validExperienceContext(
+      { ...q.context!, role: { value: '개발팀장', evidenceId: q.evidenceIds![0] } },
+      q,
+    ),
+    false,
+  );
+  assert.equal(
+    validExperienceContext(
+      { ...q.context!, target: { value: '개발자 스터디', evidenceId: 'foreign' } },
+      q,
+    ),
+    false,
+  );
+  const packet = newPacket(p, r, a, result);
+  packet.questions[0].prepared = true;
+  packet.questions[0].note = '운영 범위 확인';
+  const saved = parseProjects(JSON.stringify(saveInterview(db, p.id, packet, 0)));
+  assert.deepEqual(saved.projects[0].interviews![0].questions[0].context, q.context);
+  const changed = { ...q, context: { ...q.context!, scaleMeaning: 'unknown' as const } };
+  assert.equal(reviewQuestionStatus(changed, [q]), 'changed');
+  const regenerated = regeneratePacket(packet, {
+    ...result,
+    questions: [changed, ...result.questions.slice(1)],
+  });
+  assert.equal(regenerated.questions[0].prepared, false);
+  assert.equal(regenerated.questions[0].note, '운영 범위 확인');
+});
+
+test('missing or fabricated interpretation falls back and non-career experiences are omitted', async () => {
+  const { input } = setup();
+  for (const mode of ['missing', 'fabricated', 'excluded']) {
+    const result = await generateInterview(input, {
+      serverUrl: 'http://server',
+      proxySecret: 'fake',
+      fetch: async (_url, options) => {
+        const body = JSON.parse(String(options?.body));
+        return Response.json({
+          questions: body.questions.map(
+            (q: { id: string; experienceId: string; evidenceIds: string[] }) => ({
+              id: q.id,
+              experienceId: q.experienceId,
+              evidenceIds: q.evidenceIds,
+              title: '개발팀 운영',
+              reason: '관리 역량 확인',
+              question: '팀을 어떻게 관리했나요?',
+              followups: ['관리 방법은 무엇인가요?'],
+              guide: ['팀 관리를 설명하세요.'],
+              grounding: mode === 'excluded' ? 'excluded' : 'verified',
+              ...(mode === 'fabricated'
+                ? { context: contextFor(q.experienceId, q.evidenceIds[0], '개발팀') }
+                : {}),
+            }),
+          ),
+        });
+      },
+    });
+    assert.equal(result.generation, 'template');
+    if (mode === 'excluded') {
+      assert.equal(result.questions.length, 0);
+      assert.match(result.notice, /경력 범위 밖/);
+    } else {
+      assert.equal(result.questions.length, 4);
+      assert.ok(result.questions.every((q) => q.grounding === 'fallback' && !q.context));
+      assert.ok(!JSON.stringify(result).includes('개발팀'));
+    }
+  }
 });
 
 test('planning motivation in a JD result cannot enable career questions, even under a career heading', () => {
@@ -522,6 +663,7 @@ test('provider uses only career evidence and keeps source metadata immutable', a
             id: q.id,
             experienceId: q.topicId,
             evidenceIds: q.evidenceIds,
+            context: contextFor(q.topicId, q.evidenceIds![0]),
             title: 'Java API 성능 개선',
             reason: '응답 시간 개선 과정을 확인합니다.',
             grounding: 'verified',
@@ -562,6 +704,7 @@ test('cross-experience citations and failed grounding fall back per question wit
           id: q.id,
           experienceId: i === 0 ? 'other-experience' : q.topicId,
           evidenceIds: i === 1 ? ['invented-evidence'] : q.evidenceIds,
+          context: contextFor(q.topicId, q.evidenceIds![0]),
           title: 'API 성능 개선',
           reason: '개선 과정을 확인합니다.',
           question: 'API 처리 시간을 어떻게 개선하셨나요?',
@@ -596,6 +739,7 @@ test('only cited original sources are displayed, never model supplied text', asy
             id: q.id,
             experienceId: q.experienceId,
             evidenceIds: [q.evidenceIds[1]],
+            context: contextFor(q.experienceId, q.evidenceIds[1], '인덱스'),
             title: '인덱스 개선',
             reason: '선택 기준 확인',
             grounding: 'verified',

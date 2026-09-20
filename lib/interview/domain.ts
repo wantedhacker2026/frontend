@@ -238,6 +238,7 @@ export function regeneratePacket(
         old.question === fresh.question &&
         old.topicId === fresh.topicId &&
         JSON.stringify(old.sources) === JSON.stringify(fresh.sources) &&
+        JSON.stringify(old.context) === JSON.stringify(fresh.context) &&
         JSON.stringify(old.followups) === JSON.stringify(fresh.followups) &&
         JSON.stringify(old.guide) === JSON.stringify(fresh.guide);
       return {

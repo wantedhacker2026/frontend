@@ -10,6 +10,7 @@ import {
   type InterviewReview,
 } from '@/lib/interview/review';
 import { InterviewPrompt } from './interview-prompt';
+import { ExperienceContextSummary } from './experience-context';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { MessageSquare, RefreshCw, Copy, Printer, ArrowUp, ArrowDown, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -549,6 +550,7 @@ export function InterviewPanel({
                     {q.grounding === 'verified' ? 'AI 질문 · 맥락 자동 검토' : '기본 질문'}
                   </small>
                 )}
+                <ExperienceContextSummary question={q} />
                 {recruiter && !locked ? (
                   <SavedText
                     key={`${q.id}:question:${q.question}`}

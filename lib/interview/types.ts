@@ -1,5 +1,33 @@
 import { z } from 'zod';
 
+const experienceFactSchema = z.object({
+  value: z.string().min(1).max(160),
+  evidenceId: z.string().min(1).max(240),
+});
+export const experienceContextSchema = z.object({
+  experienceId: z.string().min(1).max(200),
+  activityType: z.enum([
+    'community-operation',
+    'software-development',
+    'service-operation',
+    'planning',
+    'project-management',
+    'research',
+    'design',
+    'collaboration',
+    'other',
+    'unclear',
+  ]),
+  status: z.enum(['clear', 'uncertain', 'non-career']),
+  target: experienceFactSchema.nullable(),
+  action: experienceFactSchema.nullable(),
+  role: experienceFactSchema.nullable(),
+  participants: experienceFactSchema.nullable(),
+  scale: experienceFactSchema.nullable(),
+  scaleMeaning: z.enum(['participants', 'team-members', 'users', 'other', 'unknown']),
+});
+export type ExperienceContext = z.infer<typeof experienceContextSchema>;
+
 export const interviewSourceSchema = z.object({
   documentId: z.string(),
   filename: z.string(),
@@ -22,6 +50,7 @@ export const interviewInputSchema = z.object({
   experienceTopics: z
     .array(
       interviewTopicSchema.extend({
+        careerContext: z.string().max(3000).optional(),
         sources: z.array(interviewSourceSchema).min(1).max(2),
       }),
     )
@@ -43,6 +72,7 @@ export const questionSchema = z.object({
   // Optional for previously saved packets. Original source text is never supplied by AI.
   evidenceIds: z.array(z.string()).max(2).optional(),
   grounding: z.enum(['verified', 'fallback']).optional(),
+  context: experienceContextSchema.optional(),
   followups: z.array(z.string().min(1).max(500)).min(1).max(3),
   guide: z.array(z.string().min(1).max(500)).min(1).max(4),
   note: z.string().max(10000),

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { templateQuestions } from './domain';
-import type { InterviewGeneration, InterviewInput } from './types';
+import { experienceContextSchema, type InterviewGeneration, type InterviewInput } from './types';
+import { validExperienceContext } from './context';
 const rewritesSchema = z.object({
   questions: z
     .array(
@@ -15,7 +16,8 @@ const rewritesSchema = z.object({
           .max(30)
           .refine((v) => !/[\r\n?!。]/u.test(v)),
         reason: z.string().trim().min(1).max(300),
-        grounding: z.enum(['verified', 'fallback']),
+        grounding: z.enum(['verified', 'fallback', 'excluded']),
+        context: experienceContextSchema.nullable().optional(),
         question: z.string().trim().min(1).max(1000),
         followups: z.array(z.string().trim().min(1).max(500)).min(1).max(3),
         guide: z.array(z.string().trim().min(1).max(500)).min(1).max(4),
@@ -65,6 +67,8 @@ export async function generateInterview(
             question: q.question,
             jdEvidence: q.jdEvidence,
             evidence: q.sources.map((s) => s.excerpt),
+            careerContext:
+              input.experienceTopics?.find((topic) => topic.id === q.topicId)?.careerContext ?? '',
           })),
         }),
       },
@@ -82,36 +86,55 @@ export async function generateInterview(
       parsed.questions.some((q) => !editable.some((e) => e.id === q.id))
     )
       throw new Error('ids');
-    const questions = fallback.questions.map((q) => {
+    let excluded = 0;
+    const questions = fallback.questions.flatMap((q) => {
       const rewrite = parsed.questions.find((r) => r.id === q.id);
+      if (
+        rewrite?.grounding === 'excluded' &&
+        rewrite.experienceId === q.topicId &&
+        rewrite.evidenceIds.length === q.evidenceIds?.length &&
+        new Set(rewrite.evidenceIds).size === rewrite.evidenceIds.length &&
+        rewrite.evidenceIds.every((id) => q.evidenceIds?.includes(id))
+      ) {
+        excluded++;
+        return [];
+      }
       // Resolve citations only within this experience. Never use provider source text.
       if (
         !rewrite ||
         rewrite.grounding !== 'verified' ||
+        !rewrite.context ||
+        !validExperienceContext(rewrite.context, q, rewrite.evidenceIds) ||
         rewrite.experienceId !== q.topicId ||
         new Set(rewrite.evidenceIds).size !== rewrite.evidenceIds.length ||
         rewrite.evidenceIds.some((id) => !q.evidenceIds?.includes(id))
       )
-        return q;
-      return {
-        ...q,
-        topic: rewrite.title,
-        reason: rewrite.reason,
-        question: rewrite.question,
-        followups: rewrite.followups,
-        guide: rewrite.guide,
-        grounding: rewrite.grounding,
-        evidenceIds: rewrite.evidenceIds,
-        sources: rewrite.evidenceIds.map((id) => q.sources[q.evidenceIds!.indexOf(id)]),
-      };
+        return [q];
+      return [
+        {
+          ...q,
+          topic: rewrite.title,
+          reason: rewrite.reason,
+          question: rewrite.question,
+          followups: rewrite.followups,
+          guide: rewrite.guide,
+          grounding: rewrite.grounding,
+          evidenceIds: rewrite.evidenceIds,
+          context: rewrite.context,
+          sources: rewrite.evidenceIds.map((id) => q.sources[q.evidenceIds!.indexOf(id)]),
+        },
+      ];
     });
     const verified = questions.filter((q) => q.grounding === 'verified').length;
     return {
       generation: verified ? 'ai' : 'template',
       notice:
-        verified === questions.length
-          ? '경력 기반 AI 질문 · 근거와의 맥락을 자동 검토한 초안입니다. 원문과 함께 확인해 주세요.'
-          : `경력 기반 질문 · AI 질문 ${verified}개, 맥락을 확인하지 못해 대체한 기본 질문 ${questions.length - verified}개입니다.`,
+        (!questions.length
+          ? '선택된 근거가 경력 업무로 확인되지 않아 질문을 생성하지 않았습니다.'
+          : verified === questions.length
+            ? '경험의 유형·대상·역할·규모를 해석하고 원문과 대조한 AI 질문입니다. 해석한 내용도 함께 확인해 주세요.'
+            : `경력 기반 질문 · AI 질문 ${verified}개, 경험의 맥락을 확인하지 못해 대체한 기본 질문 ${questions.length - verified}개입니다.`) +
+        (excluded ? ` 개인 활동 등 경력 범위 밖 근거의 질문 ${excluded}개를 제외했습니다.` : ''),
       questions,
     };
   } catch {

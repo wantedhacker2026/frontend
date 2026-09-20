@@ -58,14 +58,21 @@ export function extractExperienceTopics(
   for (const doc of revision.documents) {
     if (doc.applicantId !== personId || doc.status !== 'ready') continue;
     let inCareer = false;
+    let careerLabel = '';
     for (const page of [...doc.pages].sort((a, b) => a.number - b.number)) {
       if (doc.unreadablePages?.includes(page.number) || !page.text.trim()) {
         inCareer = false;
         continue;
       }
-      for (const line of page.text.split(/\r?\n/u)) {
+      const lines = page.text.split(/\r?\n/u);
+      let previous = '';
+      for (const [lineIndex, line] of lines.entries()) {
         const section = heading(line);
-        if (section) inCareer = section.career;
+        if (section) {
+          inCareer = section.career;
+          previous = '';
+          careerLabel = section.career ? line.slice(0, 200) : '';
+        }
         if (!inCareer) continue;
         for (const raw of (section ? section.rest : line).split(/(?<=[.!?。])\s+/u)) {
           const excerpt = raw.replace(/^[\s•●▪\-–*]+/u, '').trim();
@@ -101,6 +108,14 @@ export function extractExperienceTopics(
               jdEvidence,
               evidence: 'review',
               sources: [{ documentId: doc.id, filename: doc.filename, page: page.number, excerpt }],
+              careerContext: [careerLabel, previous, excerpt, lines[lineIndex + 1] ?? '']
+                .map((value, index) => value.slice(0, index === 2 ? 2000 : 300))
+                .filter(
+                  (value, index) =>
+                    value && !privateLine.test(value) && (index === 0 || !heading(value)),
+                )
+                .join('\n')
+                .slice(0, 3000),
             },
             // Prefer concrete actions/results; JD overlap breaks ties but never creates a topic.
             strength:
@@ -109,6 +124,7 @@ export function extractExperienceTopics(
               (related.length ? 1 : 0),
           });
         }
+        previous = privateLine.test(line) || section ? '' : line.slice(0, 300);
       }
     }
   }
