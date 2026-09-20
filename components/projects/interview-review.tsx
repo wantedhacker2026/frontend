@@ -74,6 +74,27 @@ export function InterviewReviewDialog({
                 </h3>
                 <span>{statusNames[status]}</span>
               </div>
+              <section
+                className="interview-evidence"
+                aria-label={`${index + 1}번 생성 질문의 경력 근거`}
+              >
+                {q.jdEvidence && (
+                  <>
+                    <strong>관련 공고 내용 · 참고</strong>
+                    <blockquote>{q.jdEvidence}</blockquote>
+                  </>
+                )}
+                <strong>질문의 근거가 된 경력 원문</strong>
+                {q.sources.length ? (
+                  q.sources.map((source, i) => (
+                    <InterviewSourceEvidence key={i} context={sourceContext} source={source} />
+                  ))
+                ) : (
+                  <p>지원서 원문 근거가 없는 질문입니다. 실제 경험은 면접에서 확인하세요.</p>
+                )}
+                <strong>이 경력에서 질문한 이유</strong>
+                <p>{q.reason}</p>
+              </section>
               {q.grounding && (
                 <small>
                   {q.grounding === 'verified' ? 'AI 질문 · 맥락 자동 검토' : '기본 질문'}
@@ -124,22 +145,6 @@ export function InterviewReviewDialog({
                     : '이전에 삭제한 질문입니다. 적용해도 복원되지 않습니다.'}
                 </p>
               )}
-              <section
-                className="interview-evidence"
-                aria-label={`${index + 1}번 생성 질문의 경력 근거`}
-              >
-                <strong>이 경력에서 질문한 이유</strong>
-                <p>{q.reason}</p>
-                <strong>질문의 근거가 된 경력 원문</strong>
-                {q.sources.length ? (
-                  q.sources.map((source, i) => (
-                    <InterviewSourceEvidence key={i} context={sourceContext} source={source} />
-                  ))
-                ) : (
-                  <p>지원서 원문 근거가 없는 질문입니다. 실제 경험은 면접에서 확인하세요.</p>
-                )}
-                {q.jdEvidence && <p>관련 공고 내용 · 참고: {q.jdEvidence}</p>}
-              </section>
             </article>
           );
         })}

@@ -498,6 +498,29 @@ export function InterviewPanel({
                     </div>
                   )}
                 </div>
+                <section
+                  className="interview-evidence"
+                  aria-label={`${index + 1}번 질문의 경력 근거`}
+                >
+                  {q.jdEvidence && (
+                    <>
+                      <strong>관련 공고 내용 · 참고</strong>
+                      <blockquote>{q.jdEvidence}</blockquote>
+                    </>
+                  )}
+                  <strong>질문의 근거가 된 경력 원문</strong>
+                  {q.sources.length ? (
+                    q.sources.map((s, i) => (
+                      <InterviewSourceEvidence key={i} context={sourceContext} source={s} />
+                    ))
+                  ) : (
+                    <p>
+                      {q.kind === 'common'
+                        ? 'JD 기반 공통 질문입니다.'
+                        : '확인 가능한 지원서 원문이 없습니다. 경험이 없다고 판단하지 않습니다.'}
+                    </p>
+                  )}
+                </section>
                 {!q.edited && q.grounding && (
                   <small>
                     {q.grounding === 'verified' ? 'AI 질문 · 맥락 자동 검토' : '기본 질문'}
@@ -518,29 +541,6 @@ export function InterviewPanel({
                   <h3>{q.question}</h3>
                 )}
                 <p className="interview-reason">{q.reason}</p>
-                <section
-                  className="interview-evidence"
-                  aria-label={`${index + 1}번 질문의 경력 근거`}
-                >
-                  <strong>질문의 근거가 된 경력 원문</strong>
-                  {q.sources.length ? (
-                    q.sources.map((s, i) => (
-                      <InterviewSourceEvidence key={i} context={sourceContext} source={s} />
-                    ))
-                  ) : (
-                    <p>
-                      {q.kind === 'common'
-                        ? 'JD 기반 공통 질문입니다.'
-                        : '확인 가능한 지원서 원문이 없습니다. 경험이 없다고 판단하지 않습니다.'}
-                    </p>
-                  )}
-                  {q.jdEvidence && (
-                    <>
-                      <strong>관련 공고 내용 · 참고</strong>
-                      <blockquote>{q.jdEvidence}</blockquote>
-                    </>
-                  )}
-                </section>
                 <div className="interview-guidance">
                   <strong>{recruiter ? '후속 질문' : '답변 준비 가이드'}</strong>
                   <ul>
