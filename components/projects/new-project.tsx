@@ -25,10 +25,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/states';
 import { DocumentUpload } from './document-upload';
-import { InterviewPrompt } from './interview-prompt';
 import { projectLoginPath } from '@/lib/auth/navigation';
-import { JDImport } from './jd-import';
-import { postingText } from '@/lib/job-postings/types';
 const draftSchema = z.object({
   interviewPrompt: z.string().max(2000).optional(),
   jobProfile: jobProfileIdSchema.optional(),
@@ -100,8 +97,6 @@ function ProjectForm({
   const [dirty, setDirty] = useState(false);
   const lock = useRef(false);
   const completed = useRef(false);
-  const [imageURL, setImageURL] = useState('');
-  const imageRef = useRef<HTMLInputElement>(null);
   /* eslint-disable react-hooks/set-state-in-effect -- Restore and report external browser draft storage after hydration. */
   useEffect(() => {
     try {
@@ -109,7 +104,15 @@ function ProjectForm({
         sessionStorage.getItem(storageKey) ??
         (!previous ? sessionStorage.getItem('wantedhacker-project-draft:guest:new') : null);
       if (raw) {
-        setDraft(draftSchema.parse(JSON.parse(raw)));
+        const restored = draftSchema.parse(JSON.parse(raw));
+        setDraft(
+          previous
+            ? restored
+            : {
+                ...restored,
+                jd: { ...restored.jd, mode: 'text', reference: '직접 입력', imageName: undefined },
+              },
+        );
         setDirty(true);
       }
     } catch {
@@ -138,12 +141,6 @@ function ProjectForm({
     window.addEventListener('beforeunload', listener);
     return () => window.removeEventListener('beforeunload', listener);
   }, [dirty]);
-  useEffect(
-    () => () => {
-      if (imageURL) URL.revokeObjectURL(imageURL);
-    },
-    [imageURL],
-  );
   function update(patch: Partial<ProjectDraft>) {
     setDraft((d) => ({ ...d, ...patch }));
     setDirty(true);
@@ -151,13 +148,16 @@ function ProjectForm({
   function changeText(text: string) {
     update({
       jd: { ...draft.jd, text },
-      criteria: deriveCriteria(text, draft.jobProfile, Boolean(draft.jd.imported)),
+      criteria: draft.jobProfile
+        ? deriveCriteria(text, draft.jobProfile, Boolean(draft.jd.imported))
+        : [],
     });
   }
   const selectedProfile = getJobProfile(draft.jobProfile);
   let validation = '';
   try {
-    if (actor) validateDraft(draft, actor);
+    if (!previous && !draft.jobProfile) validation = '분석 직무를 선택해 주세요.';
+    else if (actor) validateDraft(draft, actor);
     else validation = '분석하려면 로그인해 주세요.';
   } catch (e) {
     validation = (e as Error).message;
@@ -241,18 +241,19 @@ function ProjectForm({
             <select
               value={draft.jobProfile ?? ''}
               disabled={Boolean(previous)}
+              required
               onChange={(e) => {
-                const jobProfile = e.target.value
-                  ? jobProfileIdSchema.parse(e.target.value)
-                  : undefined;
+                const jobProfile = jobProfileIdSchema.parse(e.target.value);
                 update({
                   jobProfile,
-                  profileCatalogVersion: jobProfile ? JOB_PROFILE_CATALOG_VERSION : undefined,
+                  profileCatalogVersion: JOB_PROFILE_CATALOG_VERSION,
                   criteria: deriveCriteria(draft.jd.text, jobProfile, Boolean(draft.jd.imported)),
                 });
               }}
             >
-              <option value="">공통 키워드 분석</option>
+              <option value="" disabled>
+                {previous ? '직무 미지정 · 기존 분석 기준' : '분석 직무를 선택해 주세요'}
+              </option>
               {jobProfiles.map((profile) => (
                 <option key={profile.id} value={profile.id}>
                   {profile.name}
@@ -262,9 +263,7 @@ function ProjectForm({
           </label>
           <p className="project-notice">
             직무를 바꾸면 평가 기준이 해당 직무와 JD를 기준으로 다시 추출됩니다.
-            {selectedProfile
-              ? ' 키워드 언급·역할·판단·결과의 작성 근거를 0~4단계로 분류합니다.'
-              : ' 직접 또는 연관 키워드의 언급을 확인합니다.'}
+            {selectedProfile && ' 키워드 언급·역할·판단·결과의 작성 근거를 0~4단계로 분류합니다.'}
           </p>
           {selectedProfile && (
             <details className="project-profile-catalog">
@@ -292,124 +291,6 @@ function ProjectForm({
                 </section>
               ))}
             </details>
-          )}
-          {!previous && (
-            <div className="project-input-tabs" aria-label="JD 입력 방식">
-              {(
-                [
-                  { mode: 'text', label: '본문 입력' },
-                  { mode: 'url', label: '공고 URL' },
-                  { mode: 'image', label: 'JD 이미지' },
-                ] as const
-              ).map((option) => (
-                <button
-                  type="button"
-                  key={option.mode}
-                  aria-pressed={draft.jd.mode === option.mode}
-                  onClick={() => update({ jd: { ...draft.jd, mode: option.mode, reference: '' } })}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          )}
-          {draft.jd.mode === 'url' && (
-            <>
-              <label className="project-field">
-                채용공고 URL
-                <input
-                  type="url"
-                  value={draft.jd.reference}
-                  onChange={(e) => update({ jd: { ...draft.jd, reference: e.target.value } })}
-                  placeholder="https://company.com/careers/position"
-                  readOnly={Boolean(previous)}
-                />
-              </label>
-              {!previous && (
-                <JDImport
-                  key={draft.jd.reference}
-                  url={draft.jd.reference}
-                  hasText={Boolean(draft.jd.text)}
-                  onApply={(posting, originalText) => {
-                    const text = postingText(posting.sections);
-                    update({
-                      title: draft.title.trim() ? draft.title : posting.title,
-                      jd: {
-                        ...draft.jd,
-                        text,
-                        imported: {
-                          sourceUrl: posting.sourceUrl,
-                          fetchedAt: posting.fetchedAt,
-                          method: posting.method,
-                          originalText,
-                        },
-                      },
-                      criteria: deriveCriteria(text, draft.jobProfile, true),
-                    });
-                  }}
-                />
-              )}
-            </>
-          )}
-          {draft.jd.mode === 'image' && (
-            <div className="project-jd-image">
-              <input
-                className="sr-only"
-                ref={imageRef}
-                type="file"
-                accept="image/png,image/jpeg"
-                aria-label="JD 이미지 선택"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  if (
-                    !['image/png', 'image/jpeg'].includes(file.type) ||
-                    file.size > 10 * 1024 * 1024
-                  ) {
-                    setError('JD 이미지는 10MB 이하 PNG 또는 JPG로 선택해 주세요.');
-                    return;
-                  }
-                  setError('');
-                  setImageURL(URL.createObjectURL(file));
-                  update({ jd: { ...draft.jd, imageName: file.name, reference: file.name } });
-                  e.target.value = '';
-                }}
-              />
-              {!previous && (
-                <Button variant="outline" type="button" onClick={() => imageRef.current?.click()}>
-                  {draft.jd.imageName ? 'JD 이미지 교체' : 'JD 이미지 선택'}
-                </Button>
-              )}
-              {draft.jd.imageName && (
-                <p>
-                  {draft.jd.imageName}
-                  {!previous && (
-                    <button
-                      aria-label="JD 이미지 제거"
-                      type="button"
-                      onClick={() => {
-                        setImageURL('');
-                        update({ jd: { ...draft.jd, imageName: undefined, reference: '' } });
-                      }}
-                    >
-                      <X size={15} />
-                    </button>
-                  )}
-                </p>
-              )}
-              {imageURL && (
-                <div
-                  className="project-image-preview"
-                  role="img"
-                  aria-label="선택한 JD 이미지 미리보기"
-                  style={{ backgroundImage: `url("${imageURL}")` }}
-                />
-              )}
-              <p>
-                이미지 OCR은 연동 전입니다. 아래에 이미지의 JD 내용을 입력해 확인해 주세요. 원본
-                이미지는 현재 탭에서만 미리 볼 수 있습니다.
-              </p>
-            </div>
           )}
           <label className="project-field">
             분석할 JD 본문
@@ -548,12 +429,6 @@ function ProjectForm({
               </button>
             )}
           </details>
-        </section>
-        <section className="interview-panel">
-          <InterviewPrompt
-            value={draft.interviewPrompt ?? ''}
-            onChange={(interviewPrompt) => update({ interviewPrompt })}
-          />
         </section>
         <section className="project-form-section">
           <div className="project-section-title">

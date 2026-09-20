@@ -18,7 +18,6 @@ export function InterviewReviewDialog({
   open,
   onOpenChange,
   result,
-  prompt,
   previous,
   sourceContext,
   error,
@@ -29,7 +28,6 @@ export function InterviewReviewDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   result: InterviewGeneration;
-  prompt: string;
   previous?: InterviewQuestion[];
   sourceContext: EvidenceContext;
   error?: string;
@@ -58,11 +56,6 @@ export function InterviewReviewDialog({
           새로 추가되거나 달라지는 질문 {changed}개
           {previous ? ' · 기존 메모와 질문 순서는 유지됩니다.' : ''}
         </p>
-        <details>
-          <summary>생성에 요청한 지침 확인</summary>
-          <p>{prompt || '기본 지침'}</p>
-          {result.generation !== 'ai' && <p>기본 질문에는 추가 지침이 적용되지 않았습니다.</p>}
-        </details>
       </div>
       {error && (
         <p className="project-error" role="alert">

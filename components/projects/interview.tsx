@@ -9,7 +9,6 @@ import {
   reviewStorageKey,
   type InterviewReview,
 } from '@/lib/interview/review';
-import { InterviewPrompt } from './interview-prompt';
 import { ExperienceContextSummary } from './experience-context';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { MessageSquare, RefreshCw, Copy, Printer, ArrowUp, ArrowDown, Trash2 } from 'lucide-react';
@@ -74,8 +73,7 @@ export function InterviewPanel({
   revision: ProjectRevision;
   analysis: ProjectAnalysis;
 }) {
-  const { commitInterview, commitInterviewPrompt } = useProjects();
-  const [prompt, setPrompt] = useState(project.interviewPrompt ?? '');
+  const { commitInterview } = useProjects();
   const packet = project.interviews?.find((p) => p.key === packetKey(revision.id, analysis.id));
   const recruiter = project.role === 'recruiter';
   const questionPrefix = useId();
@@ -92,8 +90,8 @@ export function InterviewPanel({
   const attempted = useRef(false);
   const lock = useRef(false);
   const input = useMemo(
-    () => buildInterviewInput({ ...project, interviewPrompt: prompt }, revision, analysis),
-    [project, prompt, revision, analysis],
+    () => buildInterviewInput(project, revision, analysis),
+    [project, revision, analysis],
   );
   const hasCareer = Boolean(input.experienceTopics?.length);
   const hasPreviousQuestions = project.interviews?.some(
@@ -150,7 +148,6 @@ export function InterviewPanel({
     setError('');
     setMessage('');
     try {
-      commitInterviewPrompt(project.id, prompt, project.interviewPrompt ?? '');
       const result = await generate(input);
       if (!result.questions.length) {
         setMessage(result.notice);
@@ -160,7 +157,7 @@ export function InterviewPanel({
         key: reviewKey,
         baseVersion: packet?.version ?? 0,
         createdAt: new Date().toISOString(),
-        prompt,
+        prompt: '',
         result,
       };
       setReview(draft);
@@ -273,49 +270,6 @@ export function InterviewPanel({
           questionPrefix={questionPrefix}
         />
       )}
-      <details className="project-criteria-editor">
-        <summary>질문 생성 지침 관리</summary>
-        <InterviewPrompt
-          value={prompt}
-          onChange={setPrompt}
-          disabled={busy || (recruiter && locked)}
-        />
-        <Button
-          type="button"
-          variant="outline"
-          disabled={busy || (recruiter && locked)}
-          onClick={() => {
-            try {
-              commitInterviewPrompt(project.id, prompt, project.interviewPrompt ?? '');
-              setMessage('지침을 저장했습니다. 질문 다시 생성 시 적용됩니다.');
-            } catch (e) {
-              setError((e as Error).message);
-            }
-          }}
-        >
-          지침 저장
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          disabled={busy || (recruiter && locked)}
-          onClick={() => setPrompt('')}
-        >
-          기본 지침으로 초기화
-        </Button>
-        <p>
-          저장된 질문에는 자동 적용되지 않습니다. 질문을 다시 생성해 주세요. 직접 수정한 질문은
-          유지됩니다.
-        </p>
-        {packet && (
-          <small>
-            현재 질문에 사용한 지침:{' '}
-            {packet.generation === 'ai'
-              ? packet.promptUsed || '기본 지침'
-              : '기본 질문 (추가 지침 미적용)'}
-          </small>
-        )}
-      </details>
       {review && (
         <>
           <div className="interview-review-banner" role="status">
@@ -339,7 +293,6 @@ export function InterviewPanel({
             open={reviewOpen}
             onOpenChange={setReviewOpen}
             result={review.result}
-            prompt={review.prompt}
             previous={packet?.questions}
             sourceContext={sourceContext}
             disabled={staleReview}

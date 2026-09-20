@@ -955,16 +955,17 @@ test('anonymous generation and mismatched login roles are rejected', async () =>
   assert.equal((await POST(make({ cookie }, 'applicant'))).status, 403);
 });
 
-test('project prompt persists and enters generation without scores or private notes', () => {
+test('legacy project prompt is preserved but new questions use server defaults', () => {
   const { p, r, a, db } = setup();
   p.interviewPrompt = '트레이드오프와 장애 대응을 중심으로 질문해 주세요.';
   const restored = parseProjects(JSON.stringify({ ...db, projects: [p] }));
   const input = buildInterviewInput(restored.projects[0], r, a);
-  assert.equal(input.prompt, p.interviewPrompt);
+  assert.equal(restored.projects[0].interviewPrompt, p.interviewPrompt);
+  assert.equal(input.prompt, '');
   assert.equal(newPacket(p, r, a, templateQuestions(input)).promptUsed, '');
   assert.equal(
     newPacket(p, r, a, { ...templateQuestions(input), generation: 'ai' }).promptUsed,
-    p.interviewPrompt,
+    '',
   );
   assert.equal(
     interviewInputSchema.safeParse({ ...input, prompt: 'x'.repeat(2001) }).success,

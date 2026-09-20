@@ -1,6 +1,8 @@
 # 채용공고 URL 가져오기
 
-## 사용 방법
+> 현재 프로젝트 생성 화면에서는 공고 URL·JD 이미지 입력을 제거하고 JD 텍스트 입력만 제공합니다. 아래 수집 API 설명은 기존 구현 기록이며, 저장된 공고 출처와 분석 기록은 유지됩니다.
+
+## 이전 화면의 사용 방법
 
 로그인 → 프로젝트 생성 → 공고 URL → **URL에서 공고 가져오기** → 항목 확인·수정 → **확인한 내용 적용**.
 
@@ -13,7 +15,7 @@
 
 ## 수집 경로
 
-`components/projects/jd-import.tsx` → `POST /api/job-postings/import` → `lib/job-postings/import.ts`
+기존 입력 UI는 제거했습니다. 수집 API 구현은 `POST /api/job-postings/import` → `lib/job-postings/import.ts`에 남아 있습니다.
 
 브라우저가 외부 사이트를 직접 읽지 않고 **Next.js의 Node 서버에서 수집**합니다. Kotlin 서버 또는 OpenAI API를 호출하는 기능은 아닙니다.
 

@@ -89,7 +89,8 @@ export function buildInterviewInput(
   });
   return {
     sourceScope: 'career',
-    prompt: project.interviewPrompt ?? '',
+    // Legacy saved prompts remain readable, but new requests use server defaults.
+    prompt: '',
     role: project.role,
     topics,
     experienceTopics,
@@ -170,7 +171,7 @@ export function newPacket(
   const now = new Date().toISOString();
   return {
     ...generation,
-    promptUsed: generation.generation === 'ai' ? (project.interviewPrompt ?? '') : '',
+    promptUsed: '',
     key: packetKey(revision.id, analysis.id),
     role: project.role,
     revisionId: revision.id,
