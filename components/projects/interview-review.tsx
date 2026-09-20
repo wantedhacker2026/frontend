@@ -104,14 +104,9 @@ export function InterviewReviewDialog({
                     <h4>기존 질문</h4>
                     <p>{old.question}</p>
                     <details>
-                      <summary>기존 후속 질문·가이드</summary>
+                      <summary>기존 후속 질문</summary>
                       <ul>
                         {old.followups.map((v, i) => (
-                          <li key={i}>{v}</li>
-                        ))}
-                      </ul>
-                      <ul>
-                        {old.guide.map((v, i) => (
                           <li key={i}>{v}</li>
                         ))}
                       </ul>
@@ -124,12 +119,6 @@ export function InterviewReviewDialog({
                   <strong>후속 질문</strong>
                   <ul>
                     {q.followups.map((v, i) => (
-                      <li key={i}>{v}</li>
-                    ))}
-                  </ul>
-                  <strong>답변 준비 가이드</strong>
-                  <ul>
-                    {q.guide.map((v, i) => (
                       <li key={i}>{v}</li>
                     ))}
                   </ul>

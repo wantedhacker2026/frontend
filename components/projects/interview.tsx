@@ -541,14 +541,16 @@ export function InterviewPanel({
                   <h3>{q.question}</h3>
                 )}
                 <p className="interview-reason">{q.reason}</p>
-                <div className="interview-guidance">
-                  <strong>{recruiter ? '후속 질문' : '답변 준비 가이드'}</strong>
-                  <ul>
-                    {(recruiter ? q.followups : q.guide).map((text, i) => (
-                      <li key={i}>{text}</li>
-                    ))}
-                  </ul>
-                </div>
+                {recruiter && (
+                  <div className="interview-guidance">
+                    <strong>후속 질문</strong>
+                    <ul>
+                      {q.followups.map((text, i) => (
+                        <li key={i}>{text}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 <SavedText
                   key={`${q.id}:note:${q.note}`}
                   label={recruiter ? `${index + 1}번 면접관 메모` : `${index + 1}번 나의 연습 메모`}

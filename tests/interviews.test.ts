@@ -895,7 +895,7 @@ test('export includes interview evidence, preparation status and notes as plain 
   packet.questions[0].prepared = true;
   const text = interviewText('가상 지원자', packet);
   assert.match(text, /준비: 완료/);
-  assert.match(text, /답변 가이드/);
+  assert.doesNotMatch(text, /답변 가이드/);
   assert.match(text, /<script>/);
   assert.ok(!text.includes('총점'));
 });

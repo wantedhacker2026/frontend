@@ -259,7 +259,7 @@ export function interviewText(title: string, packet: InterviewPacket) {
     packet.notice,
     ...packet.questions.map(
       (q, i) =>
-        `\n${i + 1}. [${q.kind === 'common' ? '공통' : '개인별'} · ${q.topic}] ${q.question}\n이유: ${q.reason}\nJD: ${q.jdEvidence || '직접 지정한 기준'}\n${q.sources.map((s) => `근거: ${s.filename} p.${s.page} — ${s.excerpt}`).join('\n')}\n후속 질문: ${q.followups.join(' / ')}\n${packet.role === 'applicant' ? `준비: ${q.prepared ? '완료' : '진행 중'}\n답변 가이드: ${q.guide.join(' / ')}` : `확인 상태: ${assessmentNames[q.assessment]}`}\n메모: ${q.note || '(없음)'}`,
+        `\n${i + 1}. [${q.kind === 'common' ? '공통' : '개인별'} · ${q.topic}] ${q.question}\n이유: ${q.reason}\nJD: ${q.jdEvidence || '직접 지정한 기준'}\n${q.sources.map((s) => `근거: ${s.filename} p.${s.page} — ${s.excerpt}`).join('\n')}\n후속 질문: ${q.followups.join(' / ')}\n${packet.role === 'applicant' ? `준비: ${q.prepared ? '완료' : '진행 중'}` : `확인 상태: ${assessmentNames[q.assessment]}`}\n메모: ${q.note || '(없음)'}`,
     ),
   ].join('\n');
 }
