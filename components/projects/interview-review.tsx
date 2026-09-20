@@ -92,8 +92,6 @@ export function InterviewReviewDialog({
                 ) : (
                   <p>지원서 원문 근거가 없는 질문입니다. 실제 경험은 면접에서 확인하세요.</p>
                 )}
-                <strong>이 경력에서 질문한 이유</strong>
-                <p>{q.reason}</p>
               </section>
               {q.grounding && (
                 <small>
